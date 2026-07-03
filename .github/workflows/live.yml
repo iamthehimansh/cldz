@@ -1,0 +1,50 @@
+name: Live auth test
+
+# Manual only — makes real authenticated calls to Claude using the CLD_O
+# environment secrets. Not run on push/PR so it never spends quota automatically.
+on:
+  workflow_dispatch:
+
+jobs:
+  say-hi:
+    name: real claude via cldz
+    runs-on: ubuntu-latest
+    environment: CLD_O
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Prepare cldz config (two profiles, secrets come from env)
+        run: |
+          mkdir -p "$RUNNER_TEMP/cldzhome"
+          cat > "$RUNNER_TEMP/cldzhome/config.json" <<'JSON'
+          {
+            "version": 1,
+            "defaultProfile": "oauth",
+            "profiles": {
+              "oauth": { "type": "oauth" },
+              "key":   { "type": "apiKey" }
+            }
+          }
+          JSON
+
+      - name: Say hi via OAuth token
+        env:
+          CLDZ_HOME: ${{ runner.temp }}/cldzhome
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          echo "== OAuth token =="
+          node bin/cldz.js -P oauth -p "Reply with exactly: HELLO-FROM-OAUTH" < /dev/null
+
+      - name: Say hi via API key
+        env:
+          CLDZ_HOME: ${{ runner.temp }}/cldzhome
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "== API key =="
+          node bin/cldz.js -P key -p "Reply with exactly: HELLO-FROM-APIKEY" < /dev/null
