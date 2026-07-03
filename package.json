@@ -1,0 +1,45 @@
+{
+  "name": "cldzz",
+  "version": "0.1.1",
+  "description": "One-command launcher for Claude Code — pick an auth method (API key / OAuth / gateway / Bedrock / Vertex) once and just run `cldz`.",
+  "type": "commonjs",
+  "bin": {
+    "cldz": "bin/cldz.js",
+    "cldzz": "bin/cldz.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/cldz.js",
+    "test": "node test/smoke.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iamthehimansh/cldz.git"
+  },
+  "homepage": "https://github.com/iamthehimansh/cldz#readme",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "cli",
+    "launcher",
+    "oauth",
+    "api-key",
+    "bedrock",
+    "vertex"
+  ],
+  "author": "iamthehimansh <iamthehimansh@gmail.com>",
+  "bugs": {
+    "url": "https://github.com/iamthehimansh/cldz/issues",
+    "email": "iamthehimansh@gmail.com"
+  },
+  "license": "MIT",
+  "dependencies": {}
+}
