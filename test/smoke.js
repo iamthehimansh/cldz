@@ -90,6 +90,20 @@ check('isolated dir was seeded with onboarding flag', fs.existsSync(path.join(ho
 r = run([], { env: { CLDZ_CLAUDE_BIN: shim, ANTHROPIC_API_KEY: 'sk-ant-FROMENV' } });
 check('runtime env var overrides stored secret', /FAKE key=sk-ant-FROMENV/.test(r.stdout), r.stdout + r.stderr);
 
+// 9. shared history links the main ~/.claude projects into an isolated profile
+//    (also exercises the Windows directory-junction path in CI)
+const fakeHome = path.join(home, 'fakehome');
+fs.mkdirSync(path.join(fakeHome, '.claude', 'projects', 'proj'), { recursive: true });
+fs.writeFileSync(path.join(fakeHome, '.claude', 'projects', 'proj', 's.jsonl'), 'MARK');
+writeConfig({ version: 1, shareHistory: true, defaultProfile: 's', profiles: { s: { type: 'apiKey', apiKey: 'sk-ant-SHARE' } } });
+r = run([], { env: { CLDZ_CLAUDE_BIN: shim, HOME: fakeHome, USERPROFILE: fakeHome } });
+const linked = path.join(home, 'sessions', 's', 'projects', 'proj', 's.jsonl');
+check(
+  'shared history exposes main ~/.claude sessions to the profile',
+  fs.existsSync(linked) && fs.readFileSync(linked, 'utf8') === 'MARK',
+  r.stdout + r.stderr
+);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

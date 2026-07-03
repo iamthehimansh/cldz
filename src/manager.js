@@ -2,7 +2,7 @@
 
 const config = require('./config.js');
 const { typeDef, buildEnv } = require('./auth.js');
-const { sessionDir } = require('./run.js');
+const { sessionDir, linkSharedHistory } = require('./run.js');
 const wizard = require('./wizard.js');
 const tty = require('./tty.js');
 const { paint, colors: c } = tty;
@@ -62,7 +62,8 @@ async function manage() {
 
   for (;;) {
     printProfiles(data);
-    process.stdout.write('\n');
+    const shareState = data.shareHistory === true ? paint(c.green, 'on') : paint(c.dim, 'off');
+    process.stdout.write('\n' + paint(c.dim, 'Shared history (incl. your main ~/.claude): ') + shareState + '\n\n');
 
     const action = await tty.select('What would you like to do?', [
       { name: 'Add a profile', value: 'add' },
@@ -70,6 +71,7 @@ async function manage() {
       { name: 'Delete a profile', value: 'delete' },
       { name: 'Set default profile', value: 'default' },
       { name: 'Rename a profile', value: 'rename' },
+      { name: `Shared history: turn ${data.shareHistory === true ? 'OFF' : 'ON'}`, value: 'sharehistory' },
       { name: 'Save & exit', value: 'exit' },
     ]).catch((e) => {
       if (e.code === 'CLDZ_ABORT') return 'exit';
@@ -121,6 +123,31 @@ async function manage() {
             config.save(data);
             process.stdout.write(paint(c.green, `✓ Renamed to "${next}".\n\n`));
           }
+        }
+      } else if (action === 'sharehistory') {
+        data.shareHistory = data.shareHistory !== true;
+        config.save(data);
+        if (data.shareHistory) {
+          // Link existing isolated profiles now so history shows up immediately.
+          let linked = 0;
+          for (const [pname, p] of Object.entries(data.profiles)) {
+            if (p.isolate === false) continue;
+            try {
+              linkSharedHistory(sessionDir(pname, p));
+              linked++;
+            } catch {
+              /* ignore */
+            }
+          }
+          process.stdout.write(
+            paint(c.green, `✓ Shared history ON`) +
+              paint(c.dim, ` — all profiles now share /history and resumable sessions with your main ~/.claude (${linked} profile(s) linked).\n\n`)
+          );
+        } else {
+          process.stdout.write(
+            paint(c.green, '✓ Shared history OFF') +
+              paint(c.dim, ' — new launches keep separate history per profile. Already-linked dirs stay linked until the profile is recreated.\n\n')
+          );
         }
       }
     } catch (err) {

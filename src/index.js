@@ -40,6 +40,8 @@ ${b('ISOLATION')}
   By default each profile runs claude with its own CLAUDE_CONFIG_DIR
   (~/.cldz/sessions/<profile>/), so the profile's credential is the one used and
   your main ~/.claude login is untouched. Opt out per profile via ${b('cldz --config')}.
+  Enable "Shared history" there to make /history and --resume span all profiles
+  and your main ~/.claude.
 
 ${b('ENVIRONMENT')}
   A matching env var always overrides the saved value at run time, e.g.

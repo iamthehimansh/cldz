@@ -39,16 +39,107 @@ function seedOnboarding(dir) {
   }
 }
 
+// Conversation state Claude Code keeps inside its config dir. When "share
+// history" is on, these are symlinked back to the main ~/.claude so an isolated
+// profile sees the same /history and resumable sessions as plain `claude` and
+// every other profile — while credentials/config stay isolated.
+const SHARED_ENTRIES = [
+  { name: 'projects', file: false }, // session transcripts (--resume / history)
+  { name: 'history.jsonl', file: true }, // prompt history
+  { name: 'todos', file: false },
+  { name: 'shell-snapshots', file: false },
+];
+
+function mainClaudeDir() {
+  return path.join(os.homedir(), '.claude');
+}
+
+function symlinkCompat(target, link, file) {
+  if (!file) {
+    fs.symlinkSync(target, link, process.platform === 'win32' ? 'junction' : 'dir');
+    return;
+  }
+  if (process.platform === 'win32') {
+    try {
+      fs.symlinkSync(target, link, 'file');
+    } catch {
+      try {
+        fs.linkSync(target, link); // hard link — no privilege needed on Windows
+      } catch {
+        /* give up on the file link */
+      }
+    }
+    return;
+  }
+  fs.symlinkSync(target, link, 'file');
+}
+
+function migrateInto(link, target, file) {
+  if (file) {
+    try {
+      fs.appendFileSync(target, fs.readFileSync(link));
+    } catch {
+      /* ignore */
+    }
+    fs.rmSync(link, { force: true });
+    return;
+  }
+  try {
+    for (const child of fs.readdirSync(link)) {
+      const to = path.join(target, child);
+      if (!fs.existsSync(to)) {
+        try {
+          fs.renameSync(path.join(link, child), to);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  fs.rmSync(link, { recursive: true, force: true });
+}
+
+// Point an isolated dir's history entries at the shared ~/.claude ones. Safe to
+// call repeatedly: already-linked entries are skipped, and an entry Claude
+// already populated is migrated into the shared store before being linked.
+function linkSharedHistory(dir) {
+  const mainDir = mainClaudeDir();
+  for (const { name, file } of SHARED_ENTRIES) {
+    const target = path.join(mainDir, name);
+    const link = path.join(dir, name);
+    try {
+      if (!fs.existsSync(target)) {
+        if (file) fs.writeFileSync(target, '');
+        else fs.mkdirSync(target, { recursive: true });
+      }
+      let st = null;
+      try {
+        st = fs.lstatSync(link);
+      } catch {
+        st = null;
+      }
+      if (st && st.isSymbolicLink()) continue; // already linked
+      if (st) migrateInto(link, target, file);
+      symlinkCompat(target, link, file);
+    } catch {
+      /* best effort — history sharing is non-fatal */
+    }
+  }
+}
+
 // Unless the profile opts out (isolate: false) or the user already set
 // CLAUDE_CONFIG_DIR themselves, point claude at a per-profile config dir so the
 // profile's credential is the one actually used — a stored login in ~/.claude
 // otherwise takes precedence over an injected token. Returns the dir, or null.
-function applyIsolation(extraEnv, name, stored) {
+function applyIsolation(extraEnv, name, stored, shareHistory) {
   if (stored.isolate === false) return null;
   if (process.env.CLAUDE_CONFIG_DIR) return process.env.CLAUDE_CONFIG_DIR; // env override wins
   const dir = sessionDir(name, stored);
   fs.mkdirSync(dir, { recursive: true });
   seedOnboarding(dir);
+  if (shareHistory) linkSharedHistory(dir);
   extraEnv.CLAUDE_CONFIG_DIR = dir;
   return dir;
 }
@@ -187,12 +278,13 @@ async function run({ profile: requested, claudeArgs, quiet }) {
   const name = await determineProfile(data, requested);
   const { resolved, sources } = await resolveProfile(data, name);
   const extraEnv = buildEnv(resolved);
-  const isolatedDir = applyIsolation(extraEnv, name, data.profiles[name]);
+  const isolatedDir = applyIsolation(extraEnv, name, data.profiles[name], data.shareHistory === true);
 
   if (!quiet && process.stdout.isTTY) {
     const def = typeDef(resolved.type);
     const via = Object.values(sources).includes('env') ? paint(c.dim, ' (env override)') : '';
-    const iso = isolatedDir ? paint(c.dim, ' · isolated session') : '';
+    const shared = isolatedDir && data.shareHistory === true ? ' + shared history' : '';
+    const iso = isolatedDir ? paint(c.dim, ' · isolated session' + shared) : '';
     process.stderr.write(
       paint(c.dim, `cldz › profile "${name}" · ${def.label}${via}${iso}\n`)
     );
@@ -201,4 +293,12 @@ async function run({ profile: requested, claudeArgs, quiet }) {
   launchClaude(claudeArgs, extraEnv);
 }
 
-module.exports = { run, resolveProfile, determineProfile, launchClaude, sessionDir, applyIsolation };
+module.exports = {
+  run,
+  resolveProfile,
+  determineProfile,
+  launchClaude,
+  sessionDir,
+  applyIsolation,
+  linkSharedHistory,
+};

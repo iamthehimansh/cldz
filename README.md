@@ -101,6 +101,20 @@ You can turn isolation off for a profile in `cldz --config` (it will then share
 your main `~/.claude`), or set `CLAUDE_CONFIG_DIR` yourself to override where it
 points.
 
+### Shared history
+
+Because each isolated profile has its own dir, by default `/history` and
+`--resume` only show that profile's own conversations — not the chats you started
+with plain `claude` or under a different profile.
+
+Turn on **Shared history** in `cldz --config` (the "Shared history: turn ON"
+option) to fix that. It links each profile's conversation history
+(`projects/`, `history.jsonl`, `todos/`, `shell-snapshots/`) back to your main
+`~/.claude`, so **every profile — and plain `claude` — shares one history** while
+credentials stay isolated. Existing profiles are linked immediately (their
+current sessions are merged into `~/.claude`). On Windows this uses directory
+junctions (no admin needed).
+
 ## Environment variables
 
 | Variable | Purpose |
