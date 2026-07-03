@@ -65,7 +65,7 @@ check('--remove works', r.status === 0 && /Removed/.test(r.stdout), r.stdout + r
 const fakeJs = path.join(home, 'fakeclaude.js');
 fs.writeFileSync(
   fakeJs,
-  "console.log('FAKE key=' + (process.env.ANTHROPIC_API_KEY||'') + ' cfg=' + (process.env.CLAUDE_CONFIG_DIR||''));"
+  "console.log('FAKE key=' + (process.env.ANTHROPIC_API_KEY||'') + ' cfg=' + (process.env.CLAUDE_CONFIG_DIR||'') + ' args=' + process.argv.slice(2).join('|'));"
 );
 let shim;
 if (process.platform === 'win32') {
@@ -101,6 +101,17 @@ const linked = path.join(home, 'sessions', 's', 'projects', 'proj', 's.jsonl');
 check(
   'shared history exposes main ~/.claude sessions to the profile',
   fs.existsSync(linked) && fs.readFileSync(linked, 'utf8') === 'MARK',
+  r.stdout + r.stderr
+);
+
+// 10. skipPermissions auto-adds the flag, and never duplicates it
+writeConfig({ version: 1, skipPermissions: true, defaultProfile: 'k', profiles: { k: { type: 'apiKey', apiKey: 'sk-ant-SKIP' } } });
+r = run([], { env: { CLDZ_CLAUDE_BIN: shim } });
+check('skipPermissions adds --dangerously-skip-permissions', /args=[^\n]*--dangerously-skip-permissions/.test(r.stdout), r.stdout + r.stderr);
+r = run(['--dangerously-skip-permissions'], { env: { CLDZ_CLAUDE_BIN: shim } });
+check(
+  'does not duplicate the flag when already passed',
+  (r.stdout.match(/--dangerously-skip-permissions/g) || []).length === 1,
   r.stdout + r.stderr
 );
 

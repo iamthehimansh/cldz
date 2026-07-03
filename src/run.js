@@ -272,6 +272,8 @@ function launchClaude(claudeArgs, extraEnv) {
   });
 }
 
+const SKIP_PERMS_FLAG = '--dangerously-skip-permissions';
+
 // Entry point for the "run" path.
 async function run({ profile: requested, claudeArgs, quiet }) {
   const data = config.load();
@@ -280,17 +282,23 @@ async function run({ profile: requested, claudeArgs, quiet }) {
   const extraEnv = buildEnv(resolved);
   const isolatedDir = applyIsolation(extraEnv, name, data.profiles[name], data.shareHistory === true);
 
+  // Auto-add --dangerously-skip-permissions when enabled (don't duplicate it).
+  let finalArgs = claudeArgs;
+  const skipping = data.skipPermissions === true && !claudeArgs.includes(SKIP_PERMS_FLAG);
+  if (skipping) finalArgs = [SKIP_PERMS_FLAG, ...claudeArgs];
+
   if (!quiet && process.stdout.isTTY) {
     const def = typeDef(resolved.type);
     const via = Object.values(sources).includes('env') ? paint(c.dim, ' (env override)') : '';
     const shared = isolatedDir && data.shareHistory === true ? ' + shared history' : '';
     const iso = isolatedDir ? paint(c.dim, ' · isolated session' + shared) : '';
+    const skip = skipping ? paint(c.yellow, ' · skip-permissions') : '';
     process.stderr.write(
-      paint(c.dim, `cldz › profile "${name}" · ${def.label}${via}${iso}\n`)
+      paint(c.dim, `cldz › profile "${name}" · ${def.label}${via}${iso}`) + skip + '\n'
     );
   }
 
-  launchClaude(claudeArgs, extraEnv);
+  launchClaude(finalArgs, extraEnv);
 }
 
 module.exports = {

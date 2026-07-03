@@ -63,7 +63,12 @@ async function manage() {
   for (;;) {
     printProfiles(data);
     const shareState = data.shareHistory === true ? paint(c.green, 'on') : paint(c.dim, 'off');
-    process.stdout.write('\n' + paint(c.dim, 'Shared history (incl. your main ~/.claude): ') + shareState + '\n\n');
+    const skipState = data.skipPermissions === true ? paint(c.yellow, 'on') : paint(c.dim, 'off');
+    process.stdout.write(
+      '\n' +
+        paint(c.dim, 'Shared history (incl. your main ~/.claude): ') + shareState + '\n' +
+        paint(c.dim, 'Skip permissions (--dangerously-skip-permissions): ') + skipState + '\n\n'
+    );
 
     const action = await tty.select('What would you like to do?', [
       { name: 'Add a profile', value: 'add' },
@@ -72,6 +77,7 @@ async function manage() {
       { name: 'Set default profile', value: 'default' },
       { name: 'Rename a profile', value: 'rename' },
       { name: `Shared history: turn ${data.shareHistory === true ? 'OFF' : 'ON'}`, value: 'sharehistory' },
+      { name: `Skip permissions: turn ${data.skipPermissions === true ? 'OFF' : 'ON'}`, value: 'skipperms' },
       { name: 'Save & exit', value: 'exit' },
     ]).catch((e) => {
       if (e.code === 'CLDZ_ABORT') return 'exit';
@@ -148,6 +154,25 @@ async function manage() {
             paint(c.green, '✓ Shared history OFF') +
               paint(c.dim, ' — new launches keep separate history per profile. Already-linked dirs stay linked until the profile is recreated.\n\n')
           );
+        }
+      } else if (action === 'skipperms') {
+        if (data.skipPermissions === true) {
+          data.skipPermissions = false;
+          config.save(data);
+          process.stdout.write(paint(c.green, '✓ Skip permissions OFF.\n\n'));
+        } else {
+          process.stdout.write(
+            paint(c.yellow, '⚠ --dangerously-skip-permissions lets claude run tools without asking for approval.\n') +
+              paint(c.dim, '  Only enable this if you trust what you run.\n')
+          );
+          const ok = await tty.confirm('Enable skip-permissions for every launch?', { defaultValue: false });
+          if (ok) {
+            data.skipPermissions = true;
+            config.save(data);
+            process.stdout.write(paint(c.green, '✓ Skip permissions ON — cldz will pass --dangerously-skip-permissions to claude.\n\n'));
+          } else {
+            process.stdout.write(paint(c.dim, '(unchanged)\n\n'));
+          }
         }
       }
     } catch (err) {

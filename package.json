@@ -1,6 +1,6 @@
 {
   "name": "cldzz",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "One-command launcher for Claude Code — pick an auth method (API key / OAuth / gateway / Bedrock / Vertex) once and just run `cldz`.",
   "type": "commonjs",
   "bin": {

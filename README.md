@@ -52,6 +52,16 @@ cldz --dangerously-skip-permissions   # any claude flag passes through
 cldz -- --help               # force everything after -- through to claude
 ```
 
+## Settings
+
+`cldz --config` also has two global toggles:
+
+- **Shared history** — see [Session isolation](#session-isolation) below.
+- **Skip permissions** — when on, cldz always launches `claude` with
+  `--dangerously-skip-permissions` (claude runs tools without asking for
+  approval). You confirm once when enabling it; it's off by default. You can still
+  pass the flag manually per-run — cldz won't duplicate it.
+
 ## Managing profiles
 
 ```bash
