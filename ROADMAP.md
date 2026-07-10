@@ -21,9 +21,9 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - [x] Smoke tests for all new cases (16 checks, incl. real claude+codex launch)
 - [x] Publish milestone → 0.2.0
 
-### Phase 2 — shared history across everything
-- [ ] Link all claude profiles + main ~/.claude (done) — verify explicitly
-- [ ] Codex history sharing when isolated (link to ~/.codex)
+### Phase 2 — shared history across everything  ✅ DONE
+- [x] Link all claude profiles + main ~/.claude — verified (smoke #9)
+- [x] Codex history sharing when isolated (link to ~/.codex) — verified (smoke #15)
 
 ### Phase 3 — cross-subscription (EXPERIMENTAL)
 - [x] "Codex with Codex subscription" (launch codex) — done in Phase 1 (codexSubscription)
@@ -49,12 +49,14 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - [ ] Refresh-token handling (access_token is short-lived, rotates)
 
 ### Phase 4 — polish & feature brainstorm (add tests for each)
-- [ ] `cldz doctor` checks both claude and codex
-- [ ] `cldz --agent codex ...` shortcut
-- [ ] profile status/current command
-- [ ] `cldz --print-env`/shell eval mode
-- [ ] import existing auth (detect ANTHROPIC_API_KEY / ~/.codex) on first run
-- [ ] more (see FEATURES section, expand each iteration)
+- [x] `cldz doctor` checks both claude and codex (v0.2.0)
+- [x] profile status/current command: `--current` / `--whoami` (v0.3.0)
+- [x] `cldz --use <name>` quick default switch (v0.3.0)
+- [x] `cldz --list --json` for scripting (v0.3.0)
+- [ ] `cldz --agent codex ...` shortcut (launch codex without a codex profile)
+- [ ] `cldz --print-env`/shell eval mode (raw exports, no masking, for `eval "$(...)"`)
+- [ ] import existing auth (detect ANTHROPIC_API_KEY / OPENAI_API_KEY / ~/.codex) on first run
+- [ ] warn when a stored codex access_token is expired (decode JWT exp)
 
 ## Feature brainstorm (backlog — refine & implement top items)
 - Detect & offer to import creds already in env or ~/.codex/~/.claude on first run.
@@ -74,6 +76,7 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 ## Version log
 - 0.1.3 — skip-permissions setting (published ✅)
 - 0.2.0 — multi-agent (claude+codex) + subscription profiles (pushed to git; NOT on npm — token expired)
+- 0.3.0 — --current/--whoami, --use, --list --json; Phase 2 verified (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

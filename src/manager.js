@@ -190,10 +190,53 @@ async function manage() {
 }
 
 // Non-interactive helpers used by subcommands.
-function listProfiles() {
+function listProfiles({ json } = {}) {
   const data = config.load();
+  if (json) {
+    const out = {
+      configPath: config.configPath(),
+      defaultProfile: data.defaultProfile || null,
+      shareHistory: data.shareHistory === true,
+      skipPermissions: data.skipPermissions === true,
+      profiles: config.profileNames(data).map((name) => {
+        const p = data.profiles[name];
+        return {
+          name,
+          agent: agentOf(p),
+          type: p.type,
+          isolated: isIsolated(p),
+          default: data.defaultProfile === name,
+        };
+      }),
+    };
+    process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+    return;
+  }
   process.stdout.write(paint(c.bold, 'Profiles') + '  ' + paint(c.dim, config.configPath()) + '\n');
   printProfiles(data);
+}
+
+// Show the active/default profile and current global settings.
+function showCurrent() {
+  const data = config.load();
+  const name = data.defaultProfile || config.profileNames(data)[0];
+  if (!name || !data.profiles[name]) {
+    process.stdout.write(paint(c.dim, 'No profile configured yet — run: cldz --config\n'));
+    return;
+  }
+  const p = data.profiles[name];
+  const def = typeDef(p.type);
+  process.stdout.write(
+    paint(c.bold, name) +
+      '  ' + paint(c.cyan, `[${agentDef(agentOf(p)).label}]`) +
+      '  ' + paint(c.dim, def.label) +
+      (isIsolated(p) ? paint(c.dim, ' · isolated') : paint(c.yellow, ' · shared login')) +
+      '\n'
+  );
+  process.stdout.write(
+    paint(c.dim, `shared history: ${data.shareHistory === true ? 'on' : 'off'} · ` +
+      `skip permissions: ${data.skipPermissions === true ? 'on' : 'off'}\n`)
+  );
 }
 
 function showEnv(profileName) {
@@ -210,4 +253,4 @@ function showEnv(profileName) {
   }
 }
 
-module.exports = { manage, listProfiles, showEnv, chooseProfile };
+module.exports = { manage, listProfiles, showCurrent, showEnv, chooseProfile };

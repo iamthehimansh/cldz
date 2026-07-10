@@ -28,8 +28,9 @@ ${b('USAGE')}
 
 ${b('MANAGEMENT')}
   cldz --config                   Interactive: add / edit / delete / set-default
-  cldz --list                     List saved profiles
-  cldz --set-default <name>       Set the default profile
+  cldz --list [--json]            List saved profiles (--json for scripting)
+  cldz --current                  Show the active profile + settings (alias --whoami)
+  cldz --use <name>               Set the default profile (alias --set-default)
   cldz --remove <name>            Delete a profile
   cldz --env [name]               Print the env vars a profile sets (secrets masked)
   cldz --doctor                   Check your setup
@@ -122,13 +123,17 @@ function parse(argv) {
       return { command: 'config' };
     case '--list':
     case '--profiles':
-      return { command: 'list' };
+      return { command: 'list', json: rest.includes('--json') };
     case '--env':
       return { command: 'env', profile: argv[1] };
     case '--doctor':
       return { command: 'doctor' };
     case '--set-default':
+    case '--use':
       return { command: 'set-default', name: argv[1] };
+    case '--current':
+    case '--whoami':
+      return { command: 'current' };
     case '--remove':
     case '--delete':
       return { command: 'remove', name: argv[1] };
@@ -162,7 +167,9 @@ async function main(argv) {
     case 'config':
       return manager.manage();
     case 'list':
-      return manager.listProfiles();
+      return manager.listProfiles({ json: parsed.json });
+    case 'current':
+      return manager.showCurrent();
     case 'env':
       return manager.showEnv(parsed.profile);
     case 'set-default': {

@@ -149,6 +149,45 @@ writeConfig({ version: 1, skipPermissions: true, defaultProfile: 'cx', profiles:
 r = run([], { env: { CLDZ_CODEX_BIN: codexShim } });
 check('skip-permissions is not injected for codex', !/--dangerously-skip-permissions/.test(r.stdout), r.stdout + r.stderr);
 
+// 15. codex isolated profile shares history with ~/.codex (Phase 2)
+const fakeHome2 = path.join(home, 'fakehome2');
+fs.mkdirSync(path.join(fakeHome2, '.codex', 'sessions', 'x'), { recursive: true });
+fs.writeFileSync(path.join(fakeHome2, '.codex', 'sessions', 'x', 's.jsonl'), 'CODEXMARK');
+writeConfig({ version: 1, shareHistory: true, defaultProfile: 'ci', profiles: { ci: { type: 'codexApiKey', openaiKey: 'sk-o', isolate: true } } });
+r = run([], { env: { CLDZ_CODEX_BIN: codexShim, HOME: fakeHome2, USERPROFILE: fakeHome2 } });
+const codexLinked = path.join(home, 'sessions', 'ci', 'sessions', 'x', 's.jsonl');
+check(
+  'codex isolated profile shares history with ~/.codex',
+  fs.existsSync(codexLinked) && fs.readFileSync(codexLinked, 'utf8') === 'CODEXMARK',
+  r.stdout + r.stderr
+);
+
+// 16. --current shows the default profile + agent
+writeConfig({ version: 1, defaultProfile: 'cx', profiles: { cx: { type: 'codexSubscription' } } });
+r = run(['--current']);
+check('--current shows active profile + agent', /cx/.test(r.stdout) && /Codex/.test(r.stdout), r.stdout + r.stderr);
+r = run(['--whoami']);
+check('--whoami is an alias for --current', /cx/.test(r.stdout), r.stdout + r.stderr);
+
+// 17. --list --json emits valid JSON with the profile fields
+writeConfig({ version: 1, defaultProfile: 'a', shareHistory: true, profiles: { a: { type: 'subscription' }, b: { type: 'codexApiKey', openaiKey: 'x' } } });
+r = run(['--list', '--json']);
+let parsed = null;
+try { parsed = JSON.parse(r.stdout); } catch { /* stays null */ }
+check(
+  '--list --json emits valid JSON',
+  parsed && Array.isArray(parsed.profiles) && parsed.profiles.length === 2 &&
+    parsed.defaultProfile === 'a' && parsed.shareHistory === true &&
+    parsed.profiles.find((p) => p.name === 'b').agent === 'codex',
+  r.stdout + r.stderr
+);
+
+// 18. --use sets the default profile
+writeConfig({ version: 1, defaultProfile: 'a', profiles: { a: { type: 'subscription' }, b: { type: 'subscription' } } });
+run(['--use', 'b']);
+const after = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
+check('--use sets the default profile', after.defaultProfile === 'b', JSON.stringify(after));
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {
