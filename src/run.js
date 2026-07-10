@@ -225,6 +225,14 @@ async function determineProfile(data, requested) {
   const names = config.profileNames(data);
   if (names.length === 0) {
     process.stdout.write(paint(c.bold, 'Welcome to cldz — let’s set up authentication.\n\n'));
+    // Offer to import any credentials already on the machine first.
+    const imported = await wizard.offerImport(data);
+    if (imported) {
+      config.save(data);
+      const count = config.profileNames(data).length;
+      process.stdout.write(paint(c.green, `\n✓ Imported ${count} profile(s). Default: "${data.defaultProfile}".\n\n`));
+      return data.defaultProfile || imported;
+    }
     const name = await wizard.configureProfile(data, {});
     config.save(data);
     process.stdout.write(paint(c.green, `\n✓ Saved profile "${name}".\n\n`));

@@ -188,6 +188,29 @@ run(['--use', 'b']);
 const after = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
 check('--use sets the default profile', after.defaultProfile === 'b', JSON.stringify(after));
 
+// 19. first-run auto-imports a detected credential ($ANTHROPIC_API_KEY)
+const importHome = path.join(home, 'importhome');
+fs.mkdirSync(importHome, { recursive: true });
+fs.rmSync(path.join(home, 'config.json'), { force: true });
+r = run([], {
+  input: 'y\n',
+  env: {
+    CLDZ_CLAUDE_BIN: shim,
+    HOME: importHome,
+    USERPROFILE: importHome,
+    ANTHROPIC_API_KEY: 'sk-ant-IMPORT',
+    OPENAI_API_KEY: '',
+    CLAUDE_CODE_OAUTH_TOKEN: '',
+  },
+});
+let cfgAfter = null;
+try { cfgAfter = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8')); } catch { /* null */ }
+check(
+  'first-run imports detected $ANTHROPIC_API_KEY as an apiKey profile',
+  cfgAfter && Object.values(cfgAfter.profiles).some((p) => p.type === 'apiKey'),
+  r.stdout + r.stderr
+);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

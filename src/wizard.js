@@ -1,8 +1,66 @@
 'use strict';
 
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { AUTH_TYPES, TYPE_ORDER, typeDef } = require('./auth.js');
 const tty = require('./tty.js');
 const { paint, colors: c } = tty;
+
+// Detect credentials already present on the machine so first-run can offer to
+// create matching profiles. Env-based ones store NO secret (read from env each
+// run); login-based ones just reference the existing agent login.
+function detectCredentials() {
+  const found = [];
+  const home = os.homedir();
+  if (process.env.ANTHROPIC_API_KEY) {
+    found.push({ name: 'apikey', label: 'Anthropic API key (from $ANTHROPIC_API_KEY)', profile: { type: 'apiKey' } });
+  }
+  if (process.env.CLAUDE_CODE_OAUTH_TOKEN) {
+    found.push({ name: 'oauth', label: 'Claude OAuth token (from $CLAUDE_CODE_OAUTH_TOKEN)', profile: { type: 'oauth' } });
+  }
+  if (process.env.OPENAI_API_KEY) {
+    found.push({ name: 'openai', label: 'OpenAI API key (from $OPENAI_API_KEY)', profile: { type: 'codexApiKey' } });
+  }
+  try {
+    if (fs.existsSync(path.join(home, '.claude.json')) || fs.existsSync(path.join(home, '.claude'))) {
+      found.push({ name: 'claude', label: 'Your existing Claude login (~/.claude)', profile: { type: 'subscription' } });
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (fs.existsSync(path.join(home, '.codex', 'auth.json'))) {
+      found.push({ name: 'codex', label: 'Your existing Codex login (~/.codex)', profile: { type: 'codexSubscription' } });
+    }
+  } catch {
+    /* ignore */
+  }
+  return found;
+}
+
+// First-run offer to import detected credentials as profiles. Mutates `config`.
+// Returns the name of the first imported profile (also set as default), or null.
+async function offerImport(config) {
+  const found = detectCredentials();
+  if (!found.length) return null;
+  process.stdout.write(paint(c.bold, 'Found credentials already on this machine:') + '\n');
+  let firstName = null;
+  for (const item of found) {
+    const ok = await tty.confirm(`  Create a profile for ${item.label}?`, { defaultValue: true });
+    if (!ok) continue;
+    let name = item.name;
+    if (config.profiles[name]) {
+      let i = 2;
+      while (config.profiles[`${name}${i}`]) i++;
+      name = `${name}${i}`;
+    }
+    config.profiles[name] = item.profile;
+    if (!firstName) firstName = name;
+  }
+  if (firstName && !config.defaultProfile) config.defaultProfile = firstName;
+  return firstName;
+}
 
 function suggestName(config, type) {
   const base = type === 'apiKey' ? 'apikey' : type;
@@ -131,4 +189,4 @@ async function configureProfile(config, opts = {}) {
   return name;
 }
 
-module.exports = { configureProfile, pickType, promptFields, suggestName };
+module.exports = { configureProfile, pickType, promptFields, suggestName, detectCredentials, offerImport };

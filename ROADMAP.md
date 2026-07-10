@@ -43,19 +43,31 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
       ANTHROPIC_BASE_URL=http://localhost:PORT + ANTHROPIC_AUTH_TOKEN, launches claude,
       and tears down the proxy on exit. Requires python3 + switchyard (doctor should check).
     - Keep it OPTIONAL/experimental; cldz stays zero-dep for the core.
-  - NEXT ACTION for iteration: read Switchyard README/docs deeper (WebFetch the docs/
-    examples pages) to answer Q1/Q2, then prototype profiles.yaml + a manual curl test
-    against the ChatGPT backend before wiring into cldz.
-- [ ] Refresh-token handling (access_token is short-lived, rotates)
+  - FINDING (2026-07-11, installed & inspected v via venv):
+    - Switchyard HAS an Anthropic-inbound endpoint (anthropic_messages_endpoint.py) ✅ (Q1 yes).
+    - `switchyard launch claude` exists (proxy + spawn claude, ollama-style) ✅.
+    - BUT backends are base_url + api_key only; built-ins are anthropic.com / api.openai.com /
+      openrouter. **No ChatGPT-subscription backend, no `chatgpt-account-id` header support** (Q2 NO).
+    - User's ~/.codex/auth.json has **no OPENAI_API_KEY** (pure ChatGPT subscription tokens).
+    - CONCLUSION: Switchyard CANNOT bridge Claude Code to the Codex/ChatGPT *subscription*.
+      It only bridges to standard API-key providers (OpenAI/OpenRouter/Anthropic).
+    - POLICY: routing a ChatGPT subscription into a non-ChatGPT tool also violates OpenAI ToS.
+      => Do NOT ship a subscription bridge. Mark BLOCKED / won't-fix for the subscription case.
+  - ACHIEVABLE (optional, needs user's own OpenRouter/OpenAI key — NOT the subscription):
+    "Claude Code on OpenAI/OpenRouter models via Switchyard". Could be a future opt-in
+    profile type `claudeViaProxy` that manages `switchyard launch claude`. Deferred unless
+    the user asks — it needs a python dep and their API key, and isn't the subscription.
+- [x] "Codex with Codex subscription" already works (Phase 1). "Claude on Codex sub" = BLOCKED (above).
+- [ ] Refresh-token handling — moot for the subscription bridge (blocked).
 
 ### Phase 4 — polish & feature brainstorm (add tests for each)
 - [x] `cldz doctor` checks both claude and codex (v0.2.0)
 - [x] profile status/current command: `--current` / `--whoami` (v0.3.0)
 - [x] `cldz --use <name>` quick default switch (v0.3.0)
 - [x] `cldz --list --json` for scripting (v0.3.0)
+- [x] import existing auth (detect ANTHROPIC_API_KEY / OPENAI_API_KEY / ~/.codex / ~/.claude) on first run (v0.4.0)
 - [ ] `cldz --agent codex ...` shortcut (launch codex without a codex profile)
 - [ ] `cldz --print-env`/shell eval mode (raw exports, no masking, for `eval "$(...)"`)
-- [ ] import existing auth (detect ANTHROPIC_API_KEY / OPENAI_API_KEY / ~/.codex) on first run
 - [ ] warn when a stored codex access_token is expired (decode JWT exp)
 
 ## Feature brainstorm (backlog — refine & implement top items)
@@ -77,6 +89,7 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - 0.1.3 — skip-permissions setting (published ✅)
 - 0.2.0 — multi-agent (claude+codex) + subscription profiles (pushed to git; NOT on npm — token expired)
 - 0.3.0 — --current/--whoami, --use, --list --json; Phase 2 verified (git only; npm paused)
+- 0.4.0 — first-run credential auto-import; Phase 3 (Switchyard subscription bridge) researched & BLOCKED/won't-fix (git only)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

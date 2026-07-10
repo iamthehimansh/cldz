@@ -9,6 +9,10 @@ environment variables and hands off to `claude`, passing through any arguments.
 npx cldzz        # first run walks you through setup, then launches Claude Code
 ```
 
+On first run, cldz **detects credentials you already have** — `$ANTHROPIC_API_KEY`,
+`$CLAUDE_CODE_OAUTH_TOKEN`, `$OPENAI_API_KEY`, and existing `~/.claude` / `~/.codex`
+logins — and offers to create matching profiles for you.
+
 Or install it globally:
 
 ```bash
@@ -150,10 +154,20 @@ junctions (no admin needed).
 | `CLDZ_PROFILE` | Default profile name to use |
 | `CLAUDE_CONFIG_DIR` | If set, cldz respects it instead of the per-profile isolated dir |
 
+## Notes
+
+- **Can I run Claude Code on my ChatGPT/Codex subscription?** No. A ChatGPT/Codex
+  subscription is licensed for ChatGPT and Codex, not for powering other tools, and
+  the available translation proxies (e.g. Switchyard) only bridge to standard
+  API-key providers (OpenAI / OpenRouter / Anthropic), not the subscription backend.
+  cldz lets you run **Codex on your Codex subscription** and **Claude Code on your
+  Claude subscription/keys** side by side — switch with `cldz -P <name>`.
+
 ## Requirements
 
 - Node.js >= 18
 - [Claude Code](https://claude.com/claude-code) installed (`npm i -g @anthropic-ai/claude-code`)
+- For Codex profiles: the Codex CLI installed
 
 ## Platform support
 
