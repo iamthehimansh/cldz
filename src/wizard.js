@@ -93,15 +93,20 @@ async function configureProfile(config, opts = {}) {
     }
   }
 
-  // Isolation: keep this profile's Claude session (and its credential) separate
-  // from your main ~/.claude login. Recommended so the profile's credential is
-  // the one actually used.
-  const isolate = await tty.confirm(
-    'Keep this profile isolated from your main ~/.claude login (recommended)?',
-    { defaultValue: existing.isolate !== false }
-  );
-  if (isolate) delete profile.isolate;
-  else profile.isolate = false;
+  // Isolation: keep this profile's session (and its credential) separate from the
+  // agent's main login. Subscription-style types always share the ambient login
+  // (there's nothing to inject), so we don't ask.
+  if (def.defaultIsolate === false) {
+    profile.isolate = false;
+    process.stdout.write(paint(c.dim, '  Uses your existing login (shared, not isolated).\n'));
+  } else {
+    const isolate = await tty.confirm(
+      'Keep this profile isolated from your main login (recommended)?',
+      { defaultValue: existing.isolate !== false }
+    );
+    if (isolate) delete profile.isolate;
+    else profile.isolate = false;
+  }
 
   let name = opts.name;
   if (!name) {

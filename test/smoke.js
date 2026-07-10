@@ -65,17 +65,27 @@ check('--remove works', r.status === 0 && /Removed/.test(r.stdout), r.stdout + r
 const fakeJs = path.join(home, 'fakeclaude.js');
 fs.writeFileSync(
   fakeJs,
-  "console.log('FAKE key=' + (process.env.ANTHROPIC_API_KEY||'') + ' cfg=' + (process.env.CLAUDE_CONFIG_DIR||'') + ' args=' + process.argv.slice(2).join('|'));"
+  "console.log('FAKE key=' + (process.env.ANTHROPIC_API_KEY||'') + ' cfg=' + (process.env.CLAUDE_CONFIG_DIR||'') + ' oai=' + (process.env.OPENAI_API_KEY||'') + ' args=' + process.argv.slice(2).join('|'));"
 );
-let shim;
-if (process.platform === 'win32') {
-  shim = path.join(home, 'fakeclaude.cmd');
-  fs.writeFileSync(shim, '@echo off\r\nnode "' + fakeJs + '" %*\r\n');
-} else {
-  shim = path.join(home, 'fakeclaude.sh');
-  fs.writeFileSync(shim, '#!/bin/sh\nexec node "' + fakeJs + '" "$@"\n');
-  fs.chmodSync(shim, 0o755);
+// A distinct fake for the codex agent so we can prove the right binary launches.
+const codexJs = path.join(home, 'fakecodex.js');
+fs.writeFileSync(
+  codexJs,
+  "console.log('CODEX oai=' + (process.env.OPENAI_API_KEY||'') + ' home=' + (process.env.CODEX_HOME||'') + ' args=' + process.argv.slice(2).join('|'));"
+);
+function makeShim(base, js) {
+  if (process.platform === 'win32') {
+    const s = path.join(home, base + '.cmd');
+    fs.writeFileSync(s, '@echo off\r\nnode "' + js + '" %*\r\n');
+    return s;
+  }
+  const s = path.join(home, base + '.sh');
+  fs.writeFileSync(s, '#!/bin/sh\nexec node "' + js + '" "$@"\n');
+  fs.chmodSync(s, 0o755);
+  return s;
 }
+const shim = makeShim('fakeclaude', fakeJs);
+const codexShim = makeShim('fakecodex', codexJs);
 writeConfig({ version: 1, defaultProfile: 'k', profiles: { k: { type: 'apiKey', apiKey: 'sk-ant-LAUNCH' } } });
 r = run([], { env: { CLDZ_CLAUDE_BIN: shim } });
 check('launch passes ANTHROPIC_API_KEY through to claude', /FAKE key=sk-ant-LAUNCH/.test(r.stdout), r.stdout + r.stderr);
@@ -114,6 +124,30 @@ check(
   (r.stdout.match(/--dangerously-skip-permissions/g) || []).length === 1,
   r.stdout + r.stderr
 );
+
+// 11. subscription profile: no token injected, not isolated (shared login)
+writeConfig({ version: 1, defaultProfile: 'sub', profiles: { sub: { type: 'subscription' } } });
+r = run([], { env: { CLDZ_CLAUDE_BIN: shim } });
+check(
+  'subscription profile injects no token and shares the login (no CLAUDE_CONFIG_DIR)',
+  /FAKE key= cfg= /.test(r.stdout),
+  r.stdout + r.stderr
+);
+
+// 12. codex profile launches the codex binary, not claude
+writeConfig({ version: 1, defaultProfile: 'cx', profiles: { cx: { type: 'codexSubscription' } } });
+r = run([], { env: { CLDZ_CLAUDE_BIN: shim, CLDZ_CODEX_BIN: codexShim } });
+check('codex subscription profile launches the codex binary', /^CODEX /m.test(r.stdout), r.stdout + r.stderr);
+
+// 13. codex API key profile sets OPENAI_API_KEY for codex
+writeConfig({ version: 1, defaultProfile: 'ck', profiles: { ck: { type: 'codexApiKey', openaiKey: 'sk-openai-TEST' } } });
+r = run([], { env: { CLDZ_CODEX_BIN: codexShim } });
+check('codex apiKey profile sets OPENAI_API_KEY', /CODEX oai=sk-openai-TEST/.test(r.stdout), r.stdout + r.stderr);
+
+// 14. skip-permissions does NOT apply to codex (claude-only flag)
+writeConfig({ version: 1, skipPermissions: true, defaultProfile: 'cx', profiles: { cx: { type: 'codexSubscription' } } });
+r = run([], { env: { CLDZ_CODEX_BIN: codexShim } });
+check('skip-permissions is not injected for codex', !/--dangerously-skip-permissions/.test(r.stdout), r.stdout + r.stderr);
 
 try {
   fs.rmSync(home, { recursive: true, force: true });

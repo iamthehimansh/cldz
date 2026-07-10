@@ -11,9 +11,17 @@
 //   optional - true => may be left blank
 //   default  - default value offered at the prompt
 const AUTH_TYPES = {
+  subscription: {
+    label: 'Claude subscription (default login)',
+    hint: 'uses your existing ~/.claude login',
+    agent: 'claude',
+    defaultIsolate: false, // share the ambient login; nothing to inject
+    fields: [],
+  },
   apiKey: {
     label: 'API key',
     hint: 'ANTHROPIC_API_KEY',
+    agent: 'claude',
     fields: [
       { key: 'apiKey', label: 'Anthropic API key', env: 'ANTHROPIC_API_KEY', secret: true },
     ],
@@ -21,6 +29,7 @@ const AUTH_TYPES = {
   oauth: {
     label: 'OAuth token (Pro / Max)',
     hint: 'from `claude setup-token`',
+    agent: 'claude',
     fields: [
       { key: 'oauthToken', label: 'Claude Code OAuth token', env: 'CLAUDE_CODE_OAUTH_TOKEN', secret: true },
     ],
@@ -28,6 +37,7 @@ const AUTH_TYPES = {
   gateway: {
     label: 'Custom gateway / proxy',
     hint: 'ANTHROPIC_BASE_URL',
+    agent: 'claude',
     fields: [
       { key: 'baseUrl', label: 'Base URL (e.g. https://gateway.example.com)', env: 'ANTHROPIC_BASE_URL', secret: false },
       { key: 'authToken', label: 'Auth token (blank if the gateway needs none)', env: 'ANTHROPIC_AUTH_TOKEN', secret: true, optional: true },
@@ -36,6 +46,7 @@ const AUTH_TYPES = {
   bedrock: {
     label: 'Amazon Bedrock',
     hint: 'CLAUDE_CODE_USE_BEDROCK',
+    agent: 'claude',
     staticEnv: { CLAUDE_CODE_USE_BEDROCK: '1' },
     note: 'Uses your standard AWS credentials (env, ~/.aws, or SSO).',
     fields: [
@@ -46,6 +57,7 @@ const AUTH_TYPES = {
   vertex: {
     label: 'Google Vertex AI',
     hint: 'CLAUDE_CODE_USE_VERTEX',
+    agent: 'claude',
     staticEnv: { CLAUDE_CODE_USE_VERTEX: '1' },
     note: 'Uses Google Application Default Credentials (gcloud auth).',
     fields: [
@@ -53,14 +65,40 @@ const AUTH_TYPES = {
       { key: 'region', label: 'Cloud ML region', env: 'CLOUD_ML_REGION', secret: false, default: 'us-east5' },
     ],
   },
+
+  // ---- Codex agent ----
+  codexSubscription: {
+    label: 'Codex / ChatGPT subscription (default login)',
+    hint: 'uses your existing ~/.codex login',
+    agent: 'codex',
+    defaultIsolate: false, // share the ambient ~/.codex login
+    fields: [],
+  },
+  codexApiKey: {
+    label: 'OpenAI API key (Codex)',
+    hint: 'OPENAI_API_KEY',
+    agent: 'codex',
+    fields: [
+      { key: 'openaiKey', label: 'OpenAI API key', env: 'OPENAI_API_KEY', secret: true },
+    ],
+  },
 };
 
-const TYPE_ORDER = ['apiKey', 'oauth', 'gateway', 'bedrock', 'vertex'];
+// Order shown in the picker; grouped by agent.
+const TYPE_ORDER = ['subscription', 'apiKey', 'oauth', 'gateway', 'bedrock', 'vertex', 'codexSubscription', 'codexApiKey'];
 
 function typeDef(type) {
   const def = AUTH_TYPES[type];
   if (!def) throw new Error(`unknown auth type: ${type}`);
   return def;
+}
+
+// Which agent CLI a profile/type launches.
+function agentOf(typeOrProfile) {
+  if (typeOrProfile && typeof typeOrProfile === 'object') {
+    return typeOrProfile.agent || typeDef(typeOrProfile.type).agent || 'claude';
+  }
+  return typeDef(typeOrProfile).agent || 'claude';
 }
 
 function isSecretField(field) {
@@ -82,4 +120,4 @@ function buildEnv(profile) {
   return env;
 }
 
-module.exports = { AUTH_TYPES, TYPE_ORDER, typeDef, buildEnv, isSecretField };
+module.exports = { AUTH_TYPES, TYPE_ORDER, typeDef, buildEnv, isSecretField, agentOf };

@@ -1,7 +1,7 @@
 {
   "name": "cldzz",
-  "version": "0.1.3",
-  "description": "One-command launcher for Claude Code — pick an auth method (API key / OAuth / gateway / Bedrock / Vertex) once and just run `cldz`.",
+  "version": "0.2.0",
+  "description": "One-command launcher for Claude Code and Codex — pick an agent + auth (subscription / API key / OAuth / gateway / Bedrock / Vertex / OpenAI) once and just run cldz.",
   "type": "commonjs",
   "bin": {
     "cldz": "bin/cldz.js",
@@ -33,7 +33,11 @@
     "oauth",
     "api-key",
     "bedrock",
-    "vertex"
+    "vertex",
+    "codex",
+    "openai",
+    "subscription",
+    "chatgpt"
   ],
   "author": "iamthehimansh <iamthehimansh@gmail.com>",
   "bugs": {

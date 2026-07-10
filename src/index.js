@@ -64,14 +64,15 @@ function doctor() {
   process.stdout.write(paint(c.bold, 'cldz doctor\n\n'));
   process.stdout.write(ok(`node ${process.version}`) + '\n');
 
-  const bin = process.env.CLDZ_CLAUDE_BIN || 'claude';
-  try {
-    const out = execFileSync(bin, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-    process.stdout.write(ok(`claude found: ${out.trim()}`) + '\n');
-  } catch {
-    process.stdout.write(
-      warn(`could not run "${bin} --version". Install it: npm i -g @anthropic-ai/claude-code`) + '\n'
-    );
+  const { AGENTS } = require('./agents.js');
+  for (const [key, def] of Object.entries(AGENTS)) {
+    const bin = process.env[def.binEnv] || def.bin;
+    try {
+      const out = execFileSync(bin, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      process.stdout.write(ok(`${def.label} found: ${out.trim()}`) + '\n');
+    } catch {
+      process.stdout.write(warn(`${def.label} (${key}) not found — ${def.installHint}`) + '\n');
+    }
   }
 
   const data = config.load();

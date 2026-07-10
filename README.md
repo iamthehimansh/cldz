@@ -32,15 +32,31 @@ claude
 
 `cldz` remembers your choices in `~/.cldz/config.json` and does that for you.
 
+## Agents
+
+Each profile launches one **agent** CLI:
+
+- **Claude Code** (default) — `claude`
+- **Codex** — `codex` (isolation relocates `CODEX_HOME`; binary override `CLDZ_CODEX_BIN`)
+
+So you can keep, say, a Claude subscription profile, a Claude API-key profile, and
+a Codex/ChatGPT subscription profile side by side and switch with `cldz -P <name>`.
+
 ## Auth methods
 
-| Method | Env vars it sets |
-| --- | --- |
-| **API key** | `ANTHROPIC_API_KEY` |
-| **OAuth token** (Pro / Max, from `claude setup-token`) | `CLAUDE_CODE_OAUTH_TOKEN` |
-| **Custom gateway / proxy** | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
-| **Amazon Bedrock** | `CLAUDE_CODE_USE_BEDROCK=1`, `AWS_REGION`, `AWS_PROFILE` |
-| **Google Vertex AI** | `CLAUDE_CODE_USE_VERTEX=1`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION` |
+| Method | Agent | Env vars it sets |
+| --- | --- | --- |
+| **Claude subscription** (default login) | Claude | *(none — uses your `~/.claude` login)* |
+| **API key** | Claude | `ANTHROPIC_API_KEY` |
+| **OAuth token** (Pro / Max, from `claude setup-token`) | Claude | `CLAUDE_CODE_OAUTH_TOKEN` |
+| **Custom gateway / proxy** | Claude | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
+| **Amazon Bedrock** | Claude | `CLAUDE_CODE_USE_BEDROCK=1`, `AWS_REGION`, `AWS_PROFILE` |
+| **Google Vertex AI** | Claude | `CLAUDE_CODE_USE_VERTEX=1`, `ANTHROPIC_VERTEX_PROJECT_ID`, `CLOUD_ML_REGION` |
+| **Codex / ChatGPT subscription** (default login) | Codex | *(none — uses your `~/.codex` login)* |
+| **OpenAI API key** | Codex | `OPENAI_API_KEY` |
+
+The **subscription** types use your existing login (nothing injected, not
+isolated). Everything else isolates per profile by default.
 
 ## Usage
 

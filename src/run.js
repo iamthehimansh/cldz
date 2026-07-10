@@ -4,12 +4,20 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { typeDef, buildEnv } = require('./auth.js');
+const { typeDef, buildEnv, agentOf } = require('./auth.js');
+const { agentDef } = require('./agents.js');
 const config = require('./config.js');
 const { configDir } = require('./paths.js');
 const wizard = require('./wizard.js');
 const tty = require('./tty.js');
 const { paint, colors: c } = tty;
+
+// Effective isolation for a profile: explicit flag wins, else the type default
+// (subscription-style types share the ambient login, everything else isolates).
+function isIsolated(stored) {
+  if (stored.isolate !== undefined) return stored.isolate;
+  return typeDef(stored.type).defaultIsolate !== false;
+}
 
 // Where an isolated profile keeps its own Claude Code config/credentials.
 function sessionDir(name, stored) {
@@ -39,19 +47,8 @@ function seedOnboarding(dir) {
   }
 }
 
-// Conversation state Claude Code keeps inside its config dir. When "share
-// history" is on, these are symlinked back to the main ~/.claude so an isolated
-// profile sees the same /history and resumable sessions as plain `claude` and
-// every other profile — while credentials/config stay isolated.
-const SHARED_ENTRIES = [
-  { name: 'projects', file: false }, // session transcripts (--resume / history)
-  { name: 'history.jsonl', file: true }, // prompt history
-  { name: 'todos', file: false },
-  { name: 'shell-snapshots', file: false },
-];
-
-function mainClaudeDir() {
-  return path.join(os.homedir(), '.claude');
+function agentHomeDir(agent) {
+  return path.join(os.homedir(), agentDef(agent).homeDir);
 }
 
 function symlinkCompat(target, link, file) {
@@ -101,12 +98,12 @@ function migrateInto(link, target, file) {
   fs.rmSync(link, { recursive: true, force: true });
 }
 
-// Point an isolated dir's history entries at the shared ~/.claude ones. Safe to
-// call repeatedly: already-linked entries are skipped, and an entry Claude
-// already populated is migrated into the shared store before being linked.
-function linkSharedHistory(dir) {
-  const mainDir = mainClaudeDir();
-  for (const { name, file } of SHARED_ENTRIES) {
+// Point an isolated dir's history entries at the shared agent-home ones (~/.claude
+// or ~/.codex). Safe to call repeatedly: already-linked entries are skipped, and
+// an entry the agent already populated is migrated into the shared store first.
+function linkSharedHistory(dir, agent = 'claude') {
+  const mainDir = agentHomeDir(agent);
+  for (const { name, file } of agentDef(agent).sharedEntries) {
     const target = path.join(mainDir, name);
     const link = path.join(dir, name);
     try {
@@ -129,18 +126,21 @@ function linkSharedHistory(dir) {
   }
 }
 
-// Unless the profile opts out (isolate: false) or the user already set
-// CLAUDE_CONFIG_DIR themselves, point claude at a per-profile config dir so the
-// profile's credential is the one actually used — a stored login in ~/.claude
-// otherwise takes precedence over an injected token. Returns the dir, or null.
+// Unless the profile shares the ambient login (subscription types / isolate:false)
+// or the user already set the agent's config-dir env themselves, point the agent
+// at a per-profile config dir so the profile's credential is the one actually used
+// — a stored login otherwise takes precedence over an injected token. Returns the
+// dir, or null when not isolating.
 function applyIsolation(extraEnv, name, stored, shareHistory) {
-  if (stored.isolate === false) return null;
-  if (process.env.CLAUDE_CONFIG_DIR) return process.env.CLAUDE_CONFIG_DIR; // env override wins
+  if (!isIsolated(stored)) return null;
+  const agent = agentOf(stored);
+  const cfgEnv = agentDef(agent).configDirEnv;
+  if (process.env[cfgEnv]) return process.env[cfgEnv]; // env override wins
   const dir = sessionDir(name, stored);
   fs.mkdirSync(dir, { recursive: true });
-  seedOnboarding(dir);
-  if (shareHistory) linkSharedHistory(dir);
-  extraEnv.CLAUDE_CONFIG_DIR = dir;
+  if (agentDef(agent).seedOnboarding) seedOnboarding(dir);
+  if (shareHistory) linkSharedHistory(dir, agent);
+  extraEnv[cfgEnv] = dir;
   return dir;
 }
 
@@ -242,25 +242,23 @@ async function determineProfile(data, requested) {
   return choice;
 }
 
-function launchClaude(claudeArgs, extraEnv) {
-  // Release stdin (any open prompt interface) before claude inherits it.
+function launchAgent(agent, agentArgs, extraEnv) {
+  // Release stdin (any open prompt interface) before the child inherits it.
   tty.close();
-  const bin = process.env.CLDZ_CLAUDE_BIN || 'claude';
+  const def = agentDef(agent);
+  const bin = process.env[def.binEnv] || def.bin;
   const env = { ...process.env, ...extraEnv };
-  const child = spawn(bin, claudeArgs, {
+  const child = spawn(bin, agentArgs, {
     stdio: 'inherit',
     env,
     shell: process.platform === 'win32',
   });
   child.on('error', (err) => {
     if (err.code === 'ENOENT') {
-      console.error(
-        `cldz: could not find "${bin}". Install Claude Code first:\n` +
-          '  npm install -g @anthropic-ai/claude-code'
-      );
+      console.error(`cldz: could not find "${bin}". Install ${def.label} first:\n  ${def.installHint}`);
       process.exit(127);
     }
-    console.error('cldz: failed to launch claude — ' + err.message);
+    console.error(`cldz: failed to launch ${def.label} — ${err.message}`);
     process.exit(1);
   });
   child.on('exit', (code, signal) => {
@@ -272,6 +270,9 @@ function launchClaude(claudeArgs, extraEnv) {
   });
 }
 
+// Back-compat alias.
+const launchClaude = (args, env) => launchAgent('claude', args, env);
+
 const SKIP_PERMS_FLAG = '--dangerously-skip-permissions';
 
 // Entry point for the "run" path.
@@ -280,25 +281,29 @@ async function run({ profile: requested, claudeArgs, quiet }) {
   const name = await determineProfile(data, requested);
   const { resolved, sources } = await resolveProfile(data, name);
   const extraEnv = buildEnv(resolved);
-  const isolatedDir = applyIsolation(extraEnv, name, data.profiles[name], data.shareHistory === true);
+  const stored = data.profiles[name];
+  const agent = agentOf(stored);
+  const isolatedDir = applyIsolation(extraEnv, name, stored, data.shareHistory === true);
 
-  // Auto-add --dangerously-skip-permissions when enabled (don't duplicate it).
+  // Auto-add --dangerously-skip-permissions when enabled (claude only; don't dup).
   let finalArgs = claudeArgs;
-  const skipping = data.skipPermissions === true && !claudeArgs.includes(SKIP_PERMS_FLAG);
+  const skipping =
+    agent === 'claude' && data.skipPermissions === true && !claudeArgs.includes(SKIP_PERMS_FLAG);
   if (skipping) finalArgs = [SKIP_PERMS_FLAG, ...claudeArgs];
 
   if (!quiet && process.stdout.isTTY) {
     const def = typeDef(resolved.type);
+    const agentLabel = agentDef(agent).label;
     const via = Object.values(sources).includes('env') ? paint(c.dim, ' (env override)') : '';
     const shared = isolatedDir && data.shareHistory === true ? ' + shared history' : '';
     const iso = isolatedDir ? paint(c.dim, ' · isolated session' + shared) : '';
     const skip = skipping ? paint(c.yellow, ' · skip-permissions') : '';
     process.stderr.write(
-      paint(c.dim, `cldz › profile "${name}" · ${def.label}${via}${iso}`) + skip + '\n'
+      paint(c.dim, `cldz › ${agentLabel} · profile "${name}" · ${def.label}${via}${iso}`) + skip + '\n'
     );
   }
 
-  launchClaude(finalArgs, extraEnv);
+  launchAgent(agent, finalArgs, extraEnv);
 }
 
 module.exports = {
@@ -306,7 +311,9 @@ module.exports = {
   resolveProfile,
   determineProfile,
   launchClaude,
+  launchAgent,
   sessionDir,
   applyIsolation,
   linkSharedHistory,
+  isIsolated,
 };

@@ -1,8 +1,9 @@
 'use strict';
 
 const config = require('./config.js');
-const { typeDef, buildEnv } = require('./auth.js');
-const { sessionDir, linkSharedHistory } = require('./run.js');
+const { typeDef, buildEnv, agentOf } = require('./auth.js');
+const { agentDef } = require('./agents.js');
+const { sessionDir, linkSharedHistory, isIsolated } = require('./run.js');
 const wizard = require('./wizard.js');
 const tty = require('./tty.js');
 const { paint, colors: c } = tty;
@@ -35,8 +36,9 @@ function printProfiles(data) {
     const isDefault = data.defaultProfile === name;
     const star = isDefault ? paint(c.green, ' ★ default') : '';
     const def = typeDef(p.type);
-    const iso = p.isolate === false ? '  ' + paint(c.yellow, '(shared login)') : '';
-    process.stdout.write(`  ${paint(c.bold, name)}  ${paint(c.dim, def.label)}${star}${iso}\n`);
+    const agentTag = paint(c.cyan, `[${agentDef(agentOf(p)).label}]`);
+    const iso = !isIsolated(p) ? '  ' + paint(c.yellow, '(shared login)') : '';
+    process.stdout.write(`  ${paint(c.bold, name)}  ${agentTag} ${paint(c.dim, def.label)}${star}${iso}\n`);
     const detail = maskSecrets(p);
     if (detail) process.stdout.write(paint(c.dim, `      ${detail}\n`));
   }
@@ -137,9 +139,9 @@ async function manage() {
           // Link existing isolated profiles now so history shows up immediately.
           let linked = 0;
           for (const [pname, p] of Object.entries(data.profiles)) {
-            if (p.isolate === false) continue;
+            if (!isIsolated(p)) continue;
             try {
-              linkSharedHistory(sessionDir(pname, p));
+              linkSharedHistory(sessionDir(pname, p), agentOf(p));
               linked++;
             } catch {
               /* ignore */
@@ -200,8 +202,8 @@ function showEnv(profileName) {
   if (!name || !data.profiles[name]) throw new Error('no profile configured. Run: cldz --config');
   const p = data.profiles[name];
   const env = buildEnv({ ...p });
-  if (p.isolate !== false) env.CLAUDE_CONFIG_DIR = sessionDir(name, p);
-  process.stdout.write(paint(c.dim, `# profile "${name}"\n`));
+  if (isIsolated(p)) env[agentDef(agentOf(p)).configDirEnv] = sessionDir(name, p);
+  process.stdout.write(paint(c.dim, `# profile "${name}" (${agentDef(agentOf(p)).label})\n`));
   for (const [k, v] of Object.entries(env)) {
     const secret = /TOKEN|KEY/.test(k);
     process.stdout.write(`export ${k}=${secret ? mask(v) : v}\n`);
