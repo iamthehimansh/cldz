@@ -59,6 +59,20 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
     the user asks — it needs a python dep and their API key, and isn't the subscription.
 - [x] "Codex with Codex subscription" already works (Phase 1). "Claude on Codex sub" = BLOCKED (above).
 - [ ] Refresh-token handling — moot for the subscription bridge (blocked).
+- GitHub research (2026-07-11, user asked to search):
+  - Anthropic-inbound -> ChatGPT/Codex SUBSCRIPTION backends exist:
+    insightflo/chatgpt-codex-proxy (/v1/messages -> ChatGPT Codex backend),
+    Securiteru/codex-openai-proxy, icebear0828/codex-proxy, Soju06/codex-lb,
+    heyhuynhgiabuu/proxypal. These CAN bridge Claude Code to a ChatGPT sub, BUT
+    that violates OpenAI ToS -> cldz will NOT automate/endorse it. Not blocked
+    technically anymore, but a policy no-go. Documented in README Notes.
+  - Claude-Code-as-backend / routers: musistudio/claude-code-router (popular),
+    glidea/claude-worker-proxy. These are Anthropic-compatible proxies.
+  - KEY POINT: cldz's existing `gateway` type ALREADY points Claude Code at ANY
+    Anthropic-compatible proxy (Switchyard / claude-code-router / etc.) via
+    ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN — verified with --dry-run. So the
+    LEGIT "Claude on OpenAI models via Switchyard (OpenAI API key)" path needs NO
+    new cldz code — just a gateway profile. README now has a proxy recipe.
 
 ### Phase 4 — polish & feature brainstorm (add tests for each)
 - [x] `cldz doctor` checks both claude and codex (v0.2.0)

@@ -167,14 +167,39 @@ junctions (no admin needed).
 | `CLDZ_NO_ISOLATION` | If set (=1), disables per-profile isolation for the run (use ambient login) |
 | `CLDZ_CODEX_BIN` | Path to the `codex` binary (default `codex`) |
 
+## Running Claude Code on non-Anthropic models (via a proxy)
+
+Claude Code speaks the Anthropic API, so to run it on OpenAI (or other) models you
+put an **Anthropic-compatible translation proxy** in front and point a `gateway`
+profile at it. cldz supports this out of the box — no special mode:
+
+```bash
+# 1. Run a proxy that exposes an Anthropic /v1/messages endpoint backed by OpenAI.
+#    e.g. Switchyard (NVIDIA-NeMo/Switchyard): pip install "nemo-switchyard[cli,server]"
+#    Configure it with your OpenAI API key and start it on a local port.
+
+# 2. Point a cldz gateway profile at the proxy:
+cldz --add openai --type gateway \
+  --set baseUrl=http://localhost:4000 \
+  --set authToken=$OPENAI_API_KEY \
+  --args "--model gpt-4o"
+cldz -P openai        # Claude Code, now talking to OpenAI models through the proxy
+```
+
+Any Anthropic-compatible proxy works the same way (e.g.
+[musistudio/claude-code-router](https://github.com/musistudio/claude-code-router),
+[Switchyard](https://github.com/NVIDIA-NeMo/Switchyard)). Use `cldz --dry-run -P openai`
+to see exactly what will launch.
+
 ## Notes
 
-- **Can I run Claude Code on my ChatGPT/Codex subscription?** No. A ChatGPT/Codex
-  subscription is licensed for ChatGPT and Codex, not for powering other tools, and
-  the available translation proxies (e.g. Switchyard) only bridge to standard
-  API-key providers (OpenAI / OpenRouter / Anthropic), not the subscription backend.
-  cldz lets you run **Codex on your Codex subscription** and **Claude Code on your
-  Claude subscription/keys** side by side — switch with `cldz -P <name>`.
+- **Can I run Claude Code on my ChatGPT/Codex *subscription*?** cldz does not do this.
+  There are community proxies that route a ChatGPT/Codex subscription into other
+  clients, but using a subscription outside OpenAI's official apps is against
+  OpenAI's terms of service, so cldz won't automate it. For non-Anthropic models,
+  use an **OpenAI API key** (billed per token) with the proxy recipe above.
+- cldz lets you run **Codex on your Codex subscription** and **Claude Code on your
+  Claude subscription/keys/gateway** side by side — switch with `cldz -P <name>`.
 
 ## Requirements
 
