@@ -95,6 +95,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.2.0 — multi-agent (claude+codex) + subscription profiles (pushed to git; NOT on npm — token expired)
 - 0.3.0 — --current/--whoami, --use, --list --json; Phase 2 verified (git only; npm paused)
 - 0.4.0 — first-run credential auto-import; Phase 3 subscription bridge BLOCKED/won't-fix (git only)
+- 0.5.0 — --print-env (eval mode) + per-profile default args (git only; npm paused)
 - 0.6.0 — --agent ad-hoc shortcut + codex token-expiry warning; Phase 4 complete (git only; npm paused)
 
 ## Autonomous-iteration note
