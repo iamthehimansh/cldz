@@ -27,8 +27,12 @@ const AGENTS = {
     configDirEnv: 'CODEX_HOME',
     homeDir: '.codex',
     seedOnboarding: false,
+    // sessions/ = rollout transcripts; session_index.jsonl = the index the
+    // `codex resume` picker reads (needed so cross-profile chats actually show up);
+    // history.jsonl = prompt history.
     sharedEntries: [
       { name: 'sessions', file: false },
+      { name: 'session_index.jsonl', file: true },
       { name: 'history.jsonl', file: true },
     ],
     installHint: 'install the Codex CLI (see its docs)',

@@ -153,12 +153,15 @@ check('skip-permissions is not injected for codex', !/--dangerously-skip-permiss
 const fakeHome2 = path.join(home, 'fakehome2');
 fs.mkdirSync(path.join(fakeHome2, '.codex', 'sessions', 'x'), { recursive: true });
 fs.writeFileSync(path.join(fakeHome2, '.codex', 'sessions', 'x', 's.jsonl'), 'CODEXMARK');
+fs.writeFileSync(path.join(fakeHome2, '.codex', 'session_index.jsonl'), '{"id":"x","thread_name":"t"}\n');
 writeConfig({ version: 1, shareHistory: true, defaultProfile: 'ci', profiles: { ci: { type: 'codexApiKey', openaiKey: 'sk-o', isolate: true } } });
 r = run([], { env: { CLDZ_CODEX_BIN: codexShim, HOME: fakeHome2, USERPROFILE: fakeHome2 } });
 const codexLinked = path.join(home, 'sessions', 'ci', 'sessions', 'x', 's.jsonl');
+const codexIndex = path.join(home, 'sessions', 'ci', 'session_index.jsonl');
 check(
-  'codex isolated profile shares history with ~/.codex',
-  fs.existsSync(codexLinked) && fs.readFileSync(codexLinked, 'utf8') === 'CODEXMARK',
+  'codex isolated profile shares transcripts AND the resume index with ~/.codex',
+  fs.existsSync(codexLinked) && fs.readFileSync(codexLinked, 'utf8') === 'CODEXMARK' &&
+    fs.existsSync(codexIndex) && fs.readFileSync(codexIndex, 'utf8').includes('thread_name'),
   r.stdout + r.stderr
 );
 
