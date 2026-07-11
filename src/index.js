@@ -32,6 +32,9 @@ ${b('MANAGEMENT')}
   cldz --list [--json]            List saved profiles (--json for scripting)
   cldz --current                  Show the active profile + settings (alias --whoami)
   cldz --use <name>               Set the default profile (alias --set-default)
+  cldz --add <name> --type <t>    Create a profile non-interactively
+                                    [--set k=v] [--args "…"] [--default]
+  cldz --rename <old> <new>       Rename a profile
   cldz --remove <name>            Delete a profile
   cldz --env [name]               Print the env vars a profile sets (secrets masked)
   cldz --print-env [name]         Raw exports for eval "$(cldz --print-env)" (unmasked)
@@ -101,6 +104,25 @@ function doctor() {
   process.stdout.write(paint(c.dim, `config: ${config.configPath()}\n`));
 }
 
+// `cldz --add <name> --type <t> [--set k=v ...] [--args "..."] [--default]`
+function parseAdd(argv) {
+  const opts = { command: 'add', name: undefined, type: undefined, sets: {}, argsStr: undefined, makeDefault: false };
+  for (let i = 1; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--type') opts.type = argv[++i];
+    else if (a.startsWith('--type=')) opts.type = a.slice('--type='.length);
+    else if (a === '--args') opts.argsStr = argv[++i];
+    else if (a.startsWith('--args=')) opts.argsStr = a.slice('--args='.length);
+    else if (a === '--set') {
+      const kv = argv[++i] || '';
+      const eq = kv.indexOf('=');
+      if (eq > 0) opts.sets[kv.slice(0, eq)] = kv.slice(eq + 1);
+    } else if (a === '--default') opts.makeDefault = true;
+    else if (!a.startsWith('-') && opts.name === undefined) opts.name = a;
+  }
+  return opts;
+}
+
 // Parse argv into { command, profile, claudeArgs, rest }.
 function parse(argv) {
   // Explicit force-passthrough: `cldz -- <claude args>`
@@ -109,6 +131,10 @@ function parse(argv) {
   }
 
   const first = argv[0];
+
+  // Non-interactive profile management (parsed specially).
+  if (first === '--add') return parseAdd(argv);
+  if (first === '--rename') return { command: 'rename', name: argv[1], name2: argv[2] };
 
   // Strip `--profile`/`-P` and `--agent`/`-A` selectors wherever they appear
   // before `--`.
@@ -207,6 +233,39 @@ async function main(argv) {
       config.setDefault(data, parsed.name);
       config.save(data);
       process.stdout.write(paint(c.green, `✓ Default profile is now "${parsed.name}".\n`));
+      return;
+    }
+    case 'add': {
+      const { AUTH_TYPES, agentOf } = require('./auth.js');
+      if (!parsed.name) throw new Error('usage: cldz --add <name> --type <type> [--set k=v] [--args "..."] [--default]');
+      if (!parsed.type || !AUTH_TYPES[parsed.type]) {
+        throw new Error(`--type must be one of: ${Object.keys(AUTH_TYPES).join(', ')}`);
+      }
+      const data = config.load();
+      if (data.profiles[parsed.name]) throw new Error(`profile "${parsed.name}" already exists`);
+      const profile = { type: parsed.type };
+      for (const [k, v] of Object.entries(parsed.sets)) profile[k] = v;
+      if (parsed.argsStr && parsed.argsStr.trim()) profile.args = parsed.argsStr.trim().split(/\s+/);
+      data.profiles[parsed.name] = profile;
+      if (parsed.makeDefault || config.profileNames(data).length === 1) config.setDefault(data, parsed.name);
+      config.save(data);
+      const { agentDef } = require('./agents.js');
+      process.stdout.write(
+        paint(c.green, `✓ Added "${parsed.name}"`) +
+          paint(c.dim, ` [${agentDef(agentOf(profile)).label}] ${AUTH_TYPES[parsed.type].label}`) + '\n'
+      );
+      return;
+    }
+    case 'rename': {
+      if (!parsed.name || !parsed.name2) throw new Error('usage: cldz --rename <old> <new>');
+      const data = config.load();
+      if (!data.profiles[parsed.name]) throw new Error(`profile "${parsed.name}" not found`);
+      if (data.profiles[parsed.name2]) throw new Error(`profile "${parsed.name2}" already exists`);
+      data.profiles[parsed.name2] = data.profiles[parsed.name];
+      if (data.defaultProfile === parsed.name) data.defaultProfile = parsed.name2;
+      delete data.profiles[parsed.name];
+      config.save(data);
+      process.stdout.write(paint(c.green, `✓ Renamed "${parsed.name}" → "${parsed.name2}".\n`));
       return;
     }
     case 'remove': {

@@ -74,7 +74,8 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 **Phase 4 COMPLETE.** Next: brainstormed features (see below), each with a smoke test.
 
 ## Feature brainstorm (Phase 5 backlog — implement top items, each with a smoke test)
-- [ ] Non-interactive profile mgmt: `--add <name> --type <t> [--agent a] [--args ...]`, `--rm` (have), `--edit`.
+- [x] Non-interactive profile mgmt: `--add <name> --type <t> [--set k=v] [--args] [--default]`, `--rename`, `--rm` (v0.7.0)
+- [ ] `--edit <name>` non-interactive field updates
 - [ ] `--current --json` (machine-readable active profile).
 - [ ] Config schema versioning/migration (bump `version`, migrate old shapes safely).
 - [ ] Shell completion: `cldz --completion bash|zsh|fish` prints a completion script.
@@ -97,6 +98,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.4.0 — first-run credential auto-import; Phase 3 subscription bridge BLOCKED/won't-fix (git only)
 - 0.5.0 — --print-env (eval mode) + per-profile default args (git only; npm paused)
 - 0.6.0 — --agent ad-hoc shortcut + codex token-expiry warning; Phase 4 complete (git only; npm paused)
+- 0.7.0 — non-interactive --add / --rename profile mgmt (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

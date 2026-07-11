@@ -249,6 +249,35 @@ fs.writeFileSync(path.join(codexHome, '.codex', 'auth.json'), JSON.stringify({ t
 r = run(['--doctor'], { env: { HOME: codexHome, USERPROFILE: codexHome } });
 check('doctor warns on an expired codex token', /Codex access token is expired/.test(r.stdout), r.stdout + r.stderr);
 
+// 25. --add creates a profile non-interactively (with --set and --args)
+fs.rmSync(path.join(home, 'config.json'), { force: true });
+r = run(['--add', 'work', '--type', 'apiKey', '--set', 'apiKey=sk-ant-ADD', '--args', '--model opus']);
+let addCfg = null;
+try { addCfg = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8')); } catch { /* null */ }
+check(
+  '--add creates a profile with fields, args, and sets it default',
+  addCfg && addCfg.profiles.work && addCfg.profiles.work.type === 'apiKey' &&
+    addCfg.profiles.work.apiKey === 'sk-ant-ADD' &&
+    JSON.stringify(addCfg.profiles.work.args) === JSON.stringify(['--model', 'opus']) &&
+    addCfg.defaultProfile === 'work',
+  r.stdout + r.stderr
+);
+
+// 26. --add rejects an unknown type and a duplicate name
+r = run(['--add', 'x', '--type', 'nope']);
+check('--add rejects an unknown --type', r.status !== 0 && /type must be one of/.test(r.stderr), r.stdout + r.stderr);
+r = run(['--add', 'work', '--type', 'subscription']);
+check('--add rejects a duplicate name', r.status !== 0 && /already exists/.test(r.stderr), r.stdout + r.stderr);
+
+// 27. --rename renames a profile and moves the default pointer
+r = run(['--rename', 'work', 'main']);
+const renamed = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
+check(
+  '--rename moves the profile and default pointer',
+  renamed.profiles.main && !renamed.profiles.work && renamed.defaultProfile === 'main',
+  r.stdout + r.stderr
+);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {
