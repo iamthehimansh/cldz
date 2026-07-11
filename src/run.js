@@ -466,10 +466,10 @@ async function offerCodexSignIn(name, stored) {
   let method;
   try {
     method = await tty.select(`Sign in to Codex for "${name}" now?`, [
+      { name: 'Paste the full auth.json (recommended — copy of ~/.codex/auth.json)', value: 'authjson' },
       { name: 'Sign in with codex (opens codex login)', value: 'oauth' },
-      { name: 'Paste an access token', value: 'token' },
-      { name: 'Paste the full auth.json (one line)', value: 'authjson' },
-      { name: `Later — run: cldz --login -P ${name}`, value: 'skip' },
+      { name: 'Paste an access token only (may fail — codex also needs id_token)', value: 'token' },
+      { name: `Later — run: cldz --login -P ${name} --auth-json <file>`, value: 'skip' },
     ]);
   } catch (e) {
     if (e && e.code === 'CLDZ_ABORT') return;
@@ -484,14 +484,19 @@ async function offerCodexSignIn(name, stored) {
   const shell = process.platform === 'win32';
 
   if (method === 'authjson') {
-    const raw = await tty.ask('  auth.json');
+    const raw = await tty.askJson('  Paste the full auth.json (multi-line is fine)');
     try {
       const parsed = JSON.parse(raw);
       if (!parsed.tokens || !parsed.tokens.access_token) throw new Error('missing tokens.access_token');
       fs.writeFileSync(path.join(dir, 'auth.json'), JSON.stringify(parsed, null, 2) + '\n', { mode: 0o600 });
-      process.stdout.write(paint(c.green, `  ✓ Seeded codex auth for "${name}".\n`));
+      process.stdout.write(
+        paint(c.green, `  ✓ Seeded codex auth for "${name}".`) + paint(c.dim, ' codex will refresh it from its refresh_token.\n')
+      );
     } catch (e) {
-      process.stdout.write(paint(c.red, `  Not valid auth.json: ${e.message}\n`));
+      process.stdout.write(
+        paint(c.red, `  Not valid auth.json: ${e.message}\n`) +
+          paint(c.dim, `  Tip: cldz --login -P ${name} --auth-json /path/to/auth.json\n`)
+      );
     }
     return;
   }

@@ -103,6 +103,29 @@ async function askSecret(query) {
   return line === null ? '' : line.trim();
 }
 
+// Read a possibly multi-line JSON blob: keep consuming lines until the buffer
+// parses as JSON (so a pretty-printed paste works), or a runaway guard trips.
+async function askJson(prompt) {
+  getRl();
+  process.stdout.write(`${prompt}:\n`);
+  let buf = '';
+  for (let lines = 0; lines < 1000; lines++) {
+    const line = await nextLine();
+    if (line === null) break; // EOF
+    buf += line + '\n';
+    const t = buf.trim();
+    if (t) {
+      try {
+        JSON.parse(t);
+        return t;
+      } catch {
+        /* incomplete — keep reading */
+      }
+    }
+  }
+  return buf.trim();
+}
+
 async function confirm(query, { defaultValue = true } = {}) {
   const hint = defaultValue ? 'Y/n' : 'y/N';
   const answer = (await ask(`${query} ${paint(c.dim, '[' + hint + ']')}`)).toLowerCase();
@@ -141,4 +164,4 @@ async function select(message, choices) {
   }
 }
 
-module.exports = { ask, askSecret, confirm, select, isInteractive, close, paint, colors: c };
+module.exports = { ask, askSecret, askJson, confirm, select, isInteractive, close, paint, colors: c };

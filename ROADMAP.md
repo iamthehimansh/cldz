@@ -156,6 +156,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.16.0 — cldz --login token modes for codex: --with-access-token / --with-api-key (official) + --auth-json seed (isolated only); cldz never stores tokens (git only; npm paused)
 - 0.17.0 — cldz --config offers codex sign-in on add/edit of an isolated profile (codex login / access token / auth.json); tokens go to codex auth file, not cldz config (git only; npm paused)
 - 0.17.1 — FIX: multi-line paste into --config cascaded into hundreds of junk profiles; select() now requires an explicit number (no blank default) and bails after invalid burst (git only; npm paused)
+- 0.17.2 — codex sign-in: full auth.json is now the recommended/first option and accepts a MULTI-LINE paste (assembled until valid JSON); access-token-only noted as may-fail (codex also needs id_token) (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

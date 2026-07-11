@@ -1,6 +1,6 @@
 {
   "name": "cldzz",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "description": "One-command launcher for Claude Code and Codex — pick a provider + agent, and cldz runs it (auto-proxying cross-provider via Switchyard).",
   "type": "commonjs",
   "bin": {

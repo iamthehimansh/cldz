@@ -568,8 +568,10 @@ check('cldz config never stores the pasted tokens', !cfgTxt.includes('RT') && !c
 {
   const cfgHome = path.join(home, 'cfgsignin');
   fs.mkdirSync(cfgHome, { recursive: true });
-  const authLine = '{"auth_mode":"chatgpt","tokens":{"access_token":"AAA","refresh_token":"RRR","account_id":"ID"}}';
-  const input = ['1', '8', 'y', '', 'cxacct', '3', authLine, '8', ''].join('\n');
+  // multi-line auth.json paste (the reader assembles it until valid JSON)
+  const authLine = '{\n  "auth_mode": "chatgpt",\n  "tokens": {\n    "access_token": "AAA",\n    "refresh_token": "RRR",\n    "account_id": "ID"\n  }\n}';
+  // menu: Add(1) → codexSubscription(8) → separate(y) → args(blank) → name → sign-in: auth.json(1) → JSON → Save&exit(8)
+  const input = ['1', '8', 'y', '', 'cxacct', '1', authLine, '8', ''].join('\n');
   const rr = spawnSync(process.execPath, [CLI, '--config'], {
     encoding: 'utf8',
     env: { ...baseEnv, CLDZ_HOME: cfgHome, CLDZ_CODEX_BIN: '/bin/true' },
