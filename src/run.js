@@ -13,9 +13,11 @@ const wizard = require('./wizard.js');
 const tty = require('./tty.js');
 const { paint, colors: c } = tty;
 
-// Effective isolation for a profile: explicit flag wins, else the type default
-// (subscription-style types share the ambient login, everything else isolates).
+// Effective isolation for a profile: CLDZ_NO_ISOLATION forces it off, then an
+// explicit flag wins, else the type default (subscription-style types share the
+// ambient login, everything else isolates).
 function isIsolated(stored) {
+  if (process.env.CLDZ_NO_ISOLATION) return false;
   if (stored.isolate !== undefined) return stored.isolate;
   return typeDef(stored.type).defaultIsolate !== false;
 }

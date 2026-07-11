@@ -164,6 +164,8 @@ junctions (no admin needed).
 | `CLDZ_CLAUDE_BIN` | Path to the `claude` binary (default `claude`) |
 | `CLDZ_PROFILE` | Default profile name to use |
 | `CLAUDE_CONFIG_DIR` | If set, cldz respects it instead of the per-profile isolated dir |
+| `CLDZ_NO_ISOLATION` | If set (=1), disables per-profile isolation for the run (use ambient login) |
+| `CLDZ_CODEX_BIN` | Path to the `codex` binary (default `codex`) |
 
 ## Notes
 

@@ -413,6 +413,29 @@ run(['--import', rtFile]);
 const rt = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
 check('export --with-secrets round-trips through import', rt.profiles.k && rt.profiles.k.apiKey === 'sk-rt' && rt.defaultProfile === 'k', JSON.stringify(rt));
 
+// 40. per-profile description via --desc, shown in --list and --current --json
+fs.rmSync(path.join(home, 'config.json'), { force: true });
+run(['--add', 'work', '--type', 'subscription', '--desc', 'my main account']);
+const withDesc = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
+check('--desc stores a profile description', withDesc.profiles.work.description === 'my main account', JSON.stringify(withDesc));
+r = run(['--list']);
+check('--list shows the description', /my main account/.test(r.stdout), r.stdout + r.stderr);
+r = run(['--current', '--json']);
+check('--current --json includes description', JSON.parse(r.stdout).description === 'my main account', r.stdout + r.stderr);
+run(['--edit', 'work', '--desc', 'renamed note']);
+check('--edit --desc updates the description', JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8')).profiles.work.description === 'renamed note');
+
+// 41. --path prints the config file path
+r = run(['--path']);
+check('--path prints the config file path', r.stdout.trim() === path.join(home, 'config.json'), r.stdout + r.stderr);
+
+// 42. CLDZ_NO_ISOLATION forces no isolation even for an isolating type
+writeConfig({ version: 2, defaultProfile: 'k', profiles: { k: { type: 'apiKey', apiKey: 'k' } } });
+r = run([], { env: { CLDZ_CLAUDE_BIN: shim, CLDZ_NO_ISOLATION: '1' } });
+check('CLDZ_NO_ISOLATION disables the isolated config dir', /FAKE key=k cfg= /.test(r.stdout), r.stdout + r.stderr);
+r = run(['--current', '--json'], { env: { CLDZ_NO_ISOLATION: '1' } });
+check('CLDZ_NO_ISOLATION reflected in --current --json', JSON.parse(r.stdout).isolated === false, r.stdout + r.stderr);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

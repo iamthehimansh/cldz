@@ -40,6 +40,7 @@ function printProfiles(data) {
     const agentTag = paint(c.cyan, `[${agentDef(agentOf(p)).label}]`);
     const iso = !isIsolated(p) ? '  ' + paint(c.yellow, '(shared login)') : '';
     process.stdout.write(`  ${paint(c.bold, name)}  ${agentTag} ${paint(c.dim, def.label)}${star}${iso}\n`);
+    if (p.description) process.stdout.write(paint(c.dim, `      “${p.description}”\n`));
     const detail = maskSecrets(p);
     if (detail) process.stdout.write(paint(c.dim, `      ${detail}\n`));
   }
@@ -207,6 +208,7 @@ function listProfiles({ json } = {}) {
           type: p.type,
           isolated: isIsolated(p),
           default: data.defaultProfile === name,
+          description: p.description || null,
         };
       }),
     };
@@ -239,6 +241,7 @@ function showCurrent({ json } = {}) {
           agent: agentOf(p),
           type: p.type,
           isolated: isIsolated(p),
+          description: p.description || null,
           shareHistory: data.shareHistory === true,
           skipPermissions: data.skipPermissions === true,
         },
@@ -253,6 +256,7 @@ function showCurrent({ json } = {}) {
       '  ' + paint(c.cyan, `[${agentDef(agentOf(p)).label}]`) +
       '  ' + paint(c.dim, def.label) +
       (isIsolated(p) ? paint(c.dim, ' · isolated') : paint(c.yellow, ' · shared login')) +
+      (p.description ? paint(c.dim, `  “${p.description}”`) : '') +
       '\n'
   );
   process.stdout.write(

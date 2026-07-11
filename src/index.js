@@ -53,6 +53,7 @@ ${b('MANAGEMENT')}
   cldz --env [name]               Print the env vars a profile sets (secrets masked)
   cldz --print-env [name]         Raw exports for eval "$(cldz --print-env)" (unmasked)
   cldz --doctor                   Check your setup
+  cldz --path                     Print the config file path
   cldz --export [file]            Back up config (secrets omitted; --with-secrets to include)
   cldz --import <file> [--force]  Restore/merge profiles from a backup
   cldz --completion bash|zsh|fish Print a shell-completion script
@@ -142,7 +143,9 @@ function parseAdd(argv) {
       const kv = argv[++i] || '';
       const eq = kv.indexOf('=');
       if (eq > 0) opts.sets[kv.slice(0, eq)] = kv.slice(eq + 1);
-    } else if (a === '--default') opts.makeDefault = true;
+    } else if (a === '--desc') opts.sets.description = argv[++i];
+    else if (a.startsWith('--desc=')) opts.sets.description = a.slice('--desc='.length);
+    else if (a === '--default') opts.makeDefault = true;
     else if (!a.startsWith('-') && opts.name === undefined) opts.name = a;
   }
   return opts;
@@ -162,6 +165,8 @@ function parseEdit(argv) {
       const eq = kv.indexOf('=');
       if (eq > 0) opts.sets[kv.slice(0, eq)] = kv.slice(eq + 1);
     } else if (a === '--unset') opts.unsets.push(argv[++i]);
+    else if (a === '--desc') opts.sets.description = argv[++i];
+    else if (a.startsWith('--desc=')) opts.sets.description = a.slice('--desc='.length);
     else if (a === '--default') opts.makeDefault = true;
     else if (!a.startsWith('-') && opts.name === undefined) opts.name = a;
   }
@@ -235,6 +240,8 @@ function parse(argv) {
       return { command: 'completion', shell: argv[1] };
     case '--profile-names':
       return { command: 'profile-names' };
+    case '--path':
+      return { command: 'path' };
     case '--export':
       return { command: 'export', file: argv.slice(1).find((a) => !a.startsWith('-')), withSecrets: argv.includes('--with-secrets') };
     case '--import':
@@ -282,6 +289,8 @@ async function main(argv) {
       process.stdout.write(config.profileNames(data).join('\n') + '\n');
       return;
     }
+    case 'path':
+      return process.stdout.write(config.configPath() + '\n');
     case 'export':
       return manager.exportConfig({ file: parsed.file, withSecrets: parsed.withSecrets });
     case 'import':
