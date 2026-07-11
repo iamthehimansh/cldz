@@ -440,6 +440,26 @@ check('CLDZ_NO_ISOLATION disables the isolated config dir', /FAKE key=k cfg= /.t
 r = run(['--current', '--json'], { env: { CLDZ_NO_ISOLATION: '1' } });
 check('CLDZ_NO_ISOLATION reflected in --current --json', JSON.parse(r.stdout).isolated === false, r.stdout + r.stderr);
 
+// 43. every read-only command exits 0 on an empty config (no crashes)
+const emptyHome = path.join(home, 'emptyhome');
+fs.mkdirSync(emptyHome, { recursive: true });
+const roCmds = [
+  ['--help'], ['--version'], ['--version', '--all'], ['--list'], ['--list', '--json'],
+  ['--current'], ['--current', '--json'], ['--doctor'], ['--path'], ['--export'],
+  ['--completion', 'bash'], ['--profile-names'],
+];
+let roOk = true;
+let roBad = '';
+for (const cmd of roCmds) {
+  const rr = run(cmd, { env: { CLDZ_HOME: emptyHome, HOME: emptyHome, USERPROFILE: emptyHome } });
+  if (rr.status !== 0) {
+    roOk = false;
+    roBad = cmd.join(' ') + ' -> exit ' + rr.status + ' ' + (rr.stderr || '').trim();
+    break;
+  }
+}
+check('all read-only commands exit 0 on an empty config', roOk, roBad);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

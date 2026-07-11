@@ -120,6 +120,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.11.0 — --export / --import config backup & restore (secret-safe) (git only; npm paused)
 - 0.12.0 — per-profile description + CLDZ_NO_ISOLATION + --path; Phase 6 complete (git only; npm paused)
 - 0.12.1 — shell completion covers newer flags (--export/--import/--path/--desc/etc.); coverage test (git only; npm paused)
+- 0.12.2 — regression test: all read-only commands exit 0 on empty config (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep
