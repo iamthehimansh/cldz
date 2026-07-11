@@ -110,21 +110,34 @@ async function confirm(query, { defaultValue = true } = {}) {
   return answer === 'y' || answer === 'yes';
 }
 
-// Numbered single-choice menu. Reliable across every terminal and on pipes.
-// choices: [{ name, value, hint }]
+function abort() {
+  const e = new Error('cancelled');
+  e.code = 'CLDZ_ABORT';
+  return e;
+}
+
+// Numbered single-choice menu. Requires an EXPLICIT valid number — no default on
+// blank input — and bails after a few invalid lines. This stops a multi-line
+// paste (or exhausted stdin) from cascading through defaults into unintended
+// actions (e.g. creating profiles). choices: [{ name, value, hint }]
 async function select(message, choices) {
   process.stdout.write(paint(c.bold, message) + '\n');
   choices.forEach((choice, i) => {
     const hint = choice.hint ? paint(c.dim, `  (${choice.hint})`) : '';
     process.stdout.write(`  ${paint(c.cyan, String(i + 1))}) ${choice.name}${hint}\n`);
   });
+  let invalid = 0;
   for (;;) {
-    const answer = await ask('Enter number', { defaultValue: '1' });
+    const answer = (await ask(`Enter number 1-${choices.length}`)).trim();
     const n = parseInt(answer, 10);
-    if (!Number.isNaN(n) && n >= 1 && n <= choices.length) {
+    if (answer !== '' && !Number.isNaN(n) && n >= 1 && n <= choices.length) {
       return choices[n - 1].value;
     }
-    process.stdout.write(paint(c.red, `  Please enter 1-${choices.length}.\n`));
+    if (++invalid >= 5) {
+      process.stdout.write(paint(c.red, '  Too many invalid entries — cancelled.\n'));
+      throw abort();
+    }
+    process.stdout.write(paint(c.red, `  Please enter a number 1-${choices.length}.\n`));
   }
 }
 

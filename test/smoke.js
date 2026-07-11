@@ -587,6 +587,22 @@ check('cldz config never stores the pasted tokens', !cfgTxt.includes('RT') && !c
   );
 }
 
+// 53. a multi-line paste into `--config` must NOT cascade into profile creation:
+//     select() bails after a burst of invalid input instead of defaulting.
+{
+  const pg = path.join(home, 'pasteguard');
+  fs.mkdirSync(pg, { recursive: true });
+  fs.writeFileSync(path.join(pg, 'config.json'), JSON.stringify({ version: 2, defaultProfile: 'r', profiles: { r: { type: 'subscription' } } }));
+  const blob = ['garbage line', 'ACCESS_TOKEN=$(jq ...)', 'more text', 'not a number', 'blah', 'zzz', 'nope'].join('\n') + '\n';
+  const rr = spawnSync(process.execPath, [CLI, '--config'], { encoding: 'utf8', env: { ...baseEnv, CLDZ_HOME: pg }, input: blob, timeout: 10000 });
+  const cfg = JSON.parse(fs.readFileSync(path.join(pg, 'config.json'), 'utf8'));
+  check(
+    '--config does not flood profiles on a multi-line paste (select bails on invalid burst)',
+    Object.keys(cfg.profiles).length === 1 && rr.status === 0 && !rr.signal,
+    'profiles=' + Object.keys(cfg.profiles).length + ' status=' + rr.status + ' signal=' + rr.signal,
+  );
+}
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {
