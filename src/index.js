@@ -47,6 +47,9 @@ ${b('MANAGEMENT')}
   cldz --use <name>               Set the default profile (alias --set-default)
   cldz --add <name> --type <t>    Create a profile non-interactively
                                     [--set k=v] [--args "…"] [--default]
+  cldz --add <name> --type api --provider anthropic|openai --agent claude|codex [--model M]
+                                  Unified API profile: run either agent on either provider's API
+                                    (cldz auto-proxies via Switchyard when they differ)
   cldz --edit <name> [...]        Update a profile [--type][--set k=v][--unset k][--args][--default]
   cldz --rename <old> <new>       Rename a profile
   cldz --remove <name>            Delete a profile
@@ -99,6 +102,20 @@ function doctor() {
     }
   }
 
+  // Switchyard (only needed for cross-provider `api` profiles).
+  {
+    const sw = process.env.CLDZ_SWITCHYARD_BIN || 'switchyard';
+    try {
+      execFileSync(sw, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      process.stdout.write(ok('Switchyard found (enables cross-provider api profiles)') + '\n');
+    } catch {
+      process.stdout.write(
+        paint(c.dim, '· Switchyard not installed — only needed to run an agent on the "other" provider\'s API.\n' +
+          '  Install if needed: pip install "nemo-switchyard[cli,server]"\n')
+      );
+    }
+  }
+
   // Codex token health (if a ~/.codex login exists).
   const { codexTokenInfo } = require('./codextoken.js');
   const tok = codexTokenInfo();
@@ -145,6 +162,9 @@ function parseAdd(argv) {
       if (eq > 0) opts.sets[kv.slice(0, eq)] = kv.slice(eq + 1);
     } else if (a === '--desc') opts.sets.description = argv[++i];
     else if (a.startsWith('--desc=')) opts.sets.description = a.slice('--desc='.length);
+    else if (a === '--provider') opts.sets.provider = argv[++i];
+    else if (a === '--agent') opts.sets.agent = argv[++i];
+    else if (a === '--model') opts.sets.model = argv[++i];
     else if (a === '--default') opts.makeDefault = true;
     else if (!a.startsWith('-') && opts.name === undefined) opts.name = a;
   }
@@ -167,6 +187,9 @@ function parseEdit(argv) {
     } else if (a === '--unset') opts.unsets.push(argv[++i]);
     else if (a === '--desc') opts.sets.description = argv[++i];
     else if (a.startsWith('--desc=')) opts.sets.description = a.slice('--desc='.length);
+    else if (a === '--provider') opts.sets.provider = argv[++i];
+    else if (a === '--agent') opts.sets.agent = argv[++i];
+    else if (a === '--model') opts.sets.model = argv[++i];
     else if (a === '--default') opts.makeDefault = true;
     else if (!a.startsWith('-') && opts.name === undefined) opts.name = a;
   }

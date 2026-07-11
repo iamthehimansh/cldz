@@ -167,29 +167,40 @@ junctions (no admin needed).
 | `CLDZ_NO_ISOLATION` | If set (=1), disables per-profile isolation for the run (use ambient login) |
 | `CLDZ_CODEX_BIN` | Path to the `codex` binary (default `codex`) |
 
-## Running Claude Code on non-Anthropic models (via a proxy)
+## Unified API profiles (run any agent on any provider)
 
-Claude Code speaks the Anthropic API, so to run it on OpenAI (or other) models you
-put an **Anthropic-compatible translation proxy** in front and point a `gateway`
-profile at it. cldz supports this out of the box — no special mode:
+The `api` profile type lets you store **one API key + provider + default agent**
+and run it directly — cldz handles the proxy for you when the agent and provider
+don't match natively.
 
 ```bash
-# 1. Run a proxy that exposes an Anthropic /v1/messages endpoint backed by OpenAI.
-#    e.g. Switchyard (NVIDIA-NeMo/Switchyard): pip install "nemo-switchyard[cli,server]"
-#    Configure it with your OpenAI API key and start it on a local port.
+# An OpenAI key, defaulting to Codex:
+cldz --add oai --type api --provider openai --agent codex --set apiKey=$OPENAI_API_KEY
 
-# 2. Point a cldz gateway profile at the proxy:
-cldz --add openai --type gateway \
-  --set baseUrl=http://localhost:4000 \
-  --set authToken=$OPENAI_API_KEY \
-  --args "--model gpt-4o"
-cldz -P openai        # Claude Code, now talking to OpenAI models through the proxy
+cldz -P oai                     # native: Codex on OpenAI (OPENAI_API_KEY)
+cldz -P oai --agent claude --model gpt-4o
+                                # cross: Claude Code on OpenAI — cldz auto-launches a
+                                # Switchyard proxy so Claude talks to OpenAI models
 ```
 
-Any Anthropic-compatible proxy works the same way (e.g.
-[musistudio/claude-code-router](https://github.com/musistudio/claude-code-router),
-[Switchyard](https://github.com/NVIDIA-NeMo/Switchyard)). Use `cldz --dry-run -P openai`
-to see exactly what will launch.
+The matrix:
+
+| provider | agent | how cldz runs it |
+| --- | --- | --- |
+| anthropic | claude | native — `ANTHROPIC_API_KEY` |
+| openai | codex | native — `OPENAI_API_KEY` |
+| openai | **claude** | via **Switchyard** proxy (needs a `--model`) |
+| anthropic | **codex** | via **Switchyard** proxy (needs a `--model`) |
+
+- Switch the agent per run with `--agent claude|codex`; the API key stays the same.
+- Cross-provider needs [Switchyard](https://github.com/NVIDIA-NeMo/Switchyard)
+  installed: `pip install "nemo-switchyard[cli,server]"` (cldz spawns it and tears
+  it down when the agent exits; `cldz --doctor` reports whether it's available).
+- Use `cldz --dry-run -P oai` to see exactly what will launch (command + backend).
+
+You can also point Claude Code at **any** Anthropic-compatible proxy yourself with
+the `gateway` type (e.g. [claude-code-router](https://github.com/musistudio/claude-code-router)):
+`cldz --add gw --type gateway --set baseUrl=http://localhost:4000 --set authToken=$KEY`.
 
 ## Notes
 

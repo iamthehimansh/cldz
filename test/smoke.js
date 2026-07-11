@@ -470,6 +470,40 @@ const cfgRun = spawnSync(process.execPath, [CLI, '--config'], {
 });
 check('--config exits cleanly on Save & exit (no hang)', cfgRun.status === 0 && !cfgRun.signal, 'status=' + cfgRun.status + ' signal=' + cfgRun.signal);
 
+// 45. unified `api` type — provider × agent matrix
+const swJs = path.join(home, 'fakesw.js');
+fs.writeFileSync(swJs, "console.log('SW ' + process.argv.slice(2).join('|'));");
+const swShim = makeShim('fakesw', swJs);
+
+// native anthropic + claude
+writeConfig({ version: 2, defaultProfile: 'a', profiles: { a: { type: 'api', provider: 'anthropic', apiKey: 'sk-ant-A', agent: 'claude' } } });
+r = run([], { env: { CLDZ_CLAUDE_BIN: shim } });
+check('api native (anthropic+claude) sets ANTHROPIC_API_KEY on claude', /FAKE key=sk-ant-A/.test(r.stdout), r.stdout + r.stderr);
+
+// native openai + codex
+writeConfig({ version: 2, defaultProfile: 'o', profiles: { o: { type: 'api', provider: 'openai', apiKey: 'sk-oai-O', agent: 'codex' } } });
+r = run([], { env: { CLDZ_CODEX_BIN: codexShim } });
+check('api native (openai+codex) sets OPENAI_API_KEY on codex', /CODEX oai=sk-oai-O/.test(r.stdout), r.stdout + r.stderr);
+
+// cross openai -> claude via Switchyard, using -P + --agent override
+writeConfig({ version: 2, defaultProfile: 'o', profiles: { o: { type: 'api', provider: 'openai', apiKey: 'sk-oai-X', agent: 'codex', model: 'gpt-4o' } } });
+r = run(['-P', 'o', '--agent', 'claude'], { env: { CLDZ_SWITCHYARD_BIN: swShim } });
+check(
+  'api cross (openai->claude) runs `switchyard launch claude` with the OpenAI backend',
+  /SW launch\|claude\|--base-url\|https:\/\/api\.openai\.com\/v1/.test(r.stdout) && r.stdout.includes('gpt-4o'),
+  r.stdout + r.stderr
+);
+
+// cross without a model errors helpfully
+writeConfig({ version: 2, defaultProfile: 'a', profiles: { a: { type: 'api', provider: 'anthropic', apiKey: 'sk-ant-A', agent: 'claude' } } });
+r = run(['-P', 'a', '--agent', 'codex'], { env: { CLDZ_SWITCHYARD_BIN: swShim } });
+check('api cross without a model errors helpfully', r.status !== 0 && /needs a model/.test(r.stderr), r.stdout + r.stderr);
+
+// api key read from env when not stored
+writeConfig({ version: 2, defaultProfile: 'a', profiles: { a: { type: 'api', provider: 'anthropic', agent: 'claude' } } });
+r = run([], { env: { CLDZ_CLAUDE_BIN: shim, ANTHROPIC_API_KEY: 'sk-ant-FROMENV2' } });
+check('api reads the key from env when not stored', /FAKE key=sk-ant-FROMENV2/.test(r.stdout), r.stdout + r.stderr);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

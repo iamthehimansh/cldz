@@ -11,6 +11,16 @@
 //   optional - true => may be left blank
 //   default  - default value offered at the prompt
 const AUTH_TYPES = {
+  // Unified API profile: pick a provider (anthropic|openai) + a default agent
+  // (claude|codex). Native combos launch directly; mismatched combos are routed
+  // through a Switchyard proxy automatically. Handled specially in run.js
+  // (dynamic env), so it carries no static fields here.
+  api: {
+    label: 'API key (Anthropic or OpenAI — run any agent)',
+    hint: 'auto-proxies when the API and agent differ',
+    dynamic: true,
+    fields: [],
+  },
   subscription: {
     label: 'Claude subscription (default login)',
     hint: 'uses your existing ~/.claude login',
@@ -85,7 +95,7 @@ const AUTH_TYPES = {
 };
 
 // Order shown in the picker; grouped by agent.
-const TYPE_ORDER = ['subscription', 'apiKey', 'oauth', 'gateway', 'bedrock', 'vertex', 'codexSubscription', 'codexApiKey'];
+const TYPE_ORDER = ['api', 'subscription', 'apiKey', 'oauth', 'gateway', 'bedrock', 'vertex', 'codexSubscription', 'codexApiKey'];
 
 function typeDef(type) {
   const def = AUTH_TYPES[type];

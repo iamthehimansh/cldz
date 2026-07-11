@@ -99,6 +99,19 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 
 **Phase 5 COMPLETE.**
 
+## Phase 7 — unified API profiles + proxy (v0.13.0)
+- [x] New `api` type: provider (anthropic|openai) + apiKey + default agent (claude|codex)
+- [x] Launch matrix: native combos direct; cross combos via `switchyard launch <agent>`
+      (--base-url = provider backend, --api-key, --model). cldz auto-spawns/tears down.
+- [x] `-P <name> --agent X` now OVERRIDES the profile's agent (was ad-hoc-only before);
+      `--agent X` with no -P is still ad-hoc.
+- [x] Wizard, --add/--edit (--provider/--agent/--model), --list/--current/--dry-run,
+      doctor (switchyard check), profileReadiness all handle `api`.
+- [x] Smoke tests: native both providers, cross openai->claude via fake switchyard,
+      cross-without-model error, env-key. (62 checks). README + help updated.
+- NOTE: cross-provider verified via cldz's invocation (switchyard `launch --dry-run`
+      accepts the exact args); a real API round-trip needs the user's OpenAI key.
+
 ## Phase 6 — extras (each with a smoke test)
 - [x] `cldz --export [file] [--with-secrets]` / `--import <file> [--force]` — backup/restore; secrets omitted by default (v0.11.0)
 - [x] per-profile `description` — `--desc`/`--set description=`, shown in --list + --current (v0.12.0)
@@ -136,6 +149,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.12.1 — shell completion covers newer flags (--export/--import/--path/--desc/etc.); coverage test (git only; npm paused)
 - 0.12.2 — regression test: all read-only commands exit 0 on empty config (git only; npm paused)
 - 0.12.3 — FIX: --config Save & exit hung on open stdin (now closes tty); regression test (git only; npm paused)
+- 0.13.0 — unified `api` type (provider+agent) with Switchyard auto-proxy for cross-provider; --agent overrides profile agent (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

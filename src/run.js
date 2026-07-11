@@ -25,6 +25,11 @@ function isIsolated(stored) {
 // Non-interactive check of whether a profile's required credentials resolve
 // (from config or the current environment). Subscription types are always ready.
 function profileReadiness(stored) {
+  if (stored.type === 'api') {
+    const keyEnv = stored.provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
+    const has = (process.env[keyEnv] && process.env[keyEnv] !== '') || (stored.apiKey && stored.apiKey !== '');
+    return { ready: Boolean(has), missing: has ? [] : ['$' + keyEnv] };
+  }
   const def = typeDef(stored.type);
   const missing = [];
   for (const field of def.fields) {
@@ -156,9 +161,9 @@ function linkSharedHistory(dir, agent = 'claude') {
 // at a per-profile config dir so the profile's credential is the one actually used
 // — a stored login otherwise takes precedence over an injected token. Returns the
 // dir, or null when not isolating.
-function applyIsolation(extraEnv, name, stored, shareHistory) {
+function applyIsolation(extraEnv, name, stored, shareHistory, agentName) {
   if (!isIsolated(stored)) return null;
-  const agent = agentOf(stored);
+  const agent = agentName || agentOf(stored);
   const cfgEnv = agentDef(agent).configDirEnv;
   if (process.env[cfgEnv]) return process.env[cfgEnv]; // env override wins
   const dir = sessionDir(name, stored);
@@ -308,20 +313,130 @@ const launchClaude = (args, env) => launchAgent('claude', args, env);
 
 const SKIP_PERMS_FLAG = '--dangerously-skip-permissions';
 
+// Backend base URL Switchyard should hit for a given provider.
+function backendBaseUrl(provider) {
+  return provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.anthropic.com/v1';
+}
+
+function switchyardArgs(agent, provider, key, model, agentArgs) {
+  const args = ['launch', agent, '--base-url', backendBaseUrl(provider), '--api-key', key, '--no-model-discovery'];
+  if (model) args.push('--model', model);
+  if (agentArgs.length) args.push('--', ...agentArgs);
+  return args;
+}
+
+// Cross-provider launch: Switchyard runs a translating proxy and spawns the agent
+// pointed at it, tearing the proxy down when the agent exits.
+function launchViaSwitchyard(agent, provider, key, model, agentArgs, extraEnv) {
+  tty.close();
+  const bin = process.env.CLDZ_SWITCHYARD_BIN || 'switchyard';
+  const child = spawn(bin, switchyardArgs(agent, provider, key, model, agentArgs), {
+    stdio: 'inherit',
+    env: { ...process.env, ...extraEnv },
+    shell: process.platform === 'win32',
+  });
+  child.on('error', (err) => {
+    if (err.code === 'ENOENT') {
+      console.error(
+        `cldz: running ${agent} on an ${provider} API needs the Switchyard proxy.\n` +
+          '  Install it:  pip install "nemo-switchyard[cli,server]"\n' +
+          '  (or set $CLDZ_SWITCHYARD_BIN to its path)'
+      );
+      process.exit(127);
+    }
+    console.error('cldz: failed to launch switchyard — ' + err.message);
+    process.exit(1);
+  });
+  child.on('exit', (code, signal) => {
+    if (signal) process.kill(process.pid, signal);
+    else process.exit(code == null ? 0 : code);
+  });
+}
+
+// Launch path for the unified `api` profile type (provider + agent + key).
+function launchApiProfile({ name, stored, agent, claudeArgs, data, quiet, dryRun }) {
+  const provider = stored.provider === 'openai' ? 'openai' : 'anthropic';
+  const keyEnv = provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+  const key = process.env[keyEnv] || stored.apiKey;
+  if (!key) {
+    throw new Error(`profile "${name}" needs an API key — set $${keyEnv} or run: cldz --edit ${name} --set apiKey=<key>`);
+  }
+  const native = (provider === 'anthropic' && agent === 'claude') || (provider === 'openai' && agent === 'codex');
+  if (!native && !stored.model) {
+    throw new Error(
+      `running ${agent} on an ${provider} API is cross-provider and needs a model — ` +
+        `set one: cldz --edit ${name} --set model=<model>`
+    );
+  }
+
+  // Per-profile default args + skip-permissions (claude only).
+  const defaultArgs = Array.isArray(stored.args) ? stored.args : [];
+  let finalArgs = [...defaultArgs, ...claudeArgs];
+  const skipping = agent === 'claude' && data.skipPermissions === true && !finalArgs.includes(SKIP_PERMS_FLAG);
+  if (skipping) finalArgs = [SKIP_PERMS_FLAG, ...finalArgs];
+
+  // Per-profile isolation (works for both native and proxied launches).
+  const extraEnv = {};
+  const agDef = agentDef(agent);
+  let isolatedDir = null;
+  if (isIsolated(stored) && !process.env[agDef.configDirEnv]) {
+    isolatedDir = sessionDir(name, stored);
+    fs.mkdirSync(isolatedDir, { recursive: true });
+    if (agDef.seedOnboarding) seedOnboarding(isolatedDir);
+    if (data.shareHistory === true) linkSharedHistory(isolatedDir, agent);
+    extraEnv[agDef.configDirEnv] = isolatedDir;
+  }
+  if (native) extraEnv[keyEnv] = key;
+
+  if (!quiet && process.stdout.isTTY) {
+    const mode = native
+      ? paint(c.dim, 'native')
+      : paint(c.yellow, `via Switchyard (${provider}→${agent}${stored.model ? ', ' + stored.model : ''})`);
+    process.stderr.write(paint(c.dim, `cldz › ${agDef.label} · profile "${name}" · api:${provider} · `) + mode + '\n');
+  }
+
+  if (dryRun) {
+    if (native) {
+      const bin = process.env[agDef.binEnv] || agDef.bin;
+      process.stdout.write(
+        `agent:      ${agDef.label}\n` +
+          `profile:    ${name} (api:${provider}, native)\n` +
+          `command:    ${bin} ${finalArgs.join(' ')}\n` +
+          `config dir: ${isolatedDir || '(ambient)'}\n` +
+          `env:        ${keyEnv}=${maskValue(key)}${isolatedDir ? ` ${agDef.configDirEnv}=${isolatedDir}` : ''}\n`
+      );
+    } else {
+      const bin = process.env.CLDZ_SWITCHYARD_BIN || 'switchyard';
+      const sa = switchyardArgs(agent, provider, key, stored.model, finalArgs).map((a) => (a === key ? maskValue(key) : a));
+      process.stdout.write(
+        `agent:      ${agDef.label} (via Switchyard)\n` +
+          `profile:    ${name} (api:${provider} → ${agent})\n` +
+          `command:    ${bin} ${sa.join(' ')}\n` +
+          `backend:    ${backendBaseUrl(provider)}\n` +
+          `config dir: ${isolatedDir || '(ambient)'}\n`
+      );
+    }
+    return;
+  }
+
+  if (native) launchAgent(agent, finalArgs, extraEnv);
+  else launchViaSwitchyard(agent, provider, key, stored.model, finalArgs, extraEnv);
+}
+
 // Entry point for the "run" path.
 async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet, dryRun }) {
   const data = config.load();
+  if (agentOverride && !AGENTS[agentOverride]) {
+    throw new Error(`unknown agent "${agentOverride}" — use "claude" or "codex"`);
+  }
 
   let name;
   let stored;
   let resolved;
   let sources;
-  if (agentOverride) {
-    // Ad-hoc: `cldz --agent codex|claude ...` runs the agent on its ambient login
-    // (no profile, no isolation, nothing injected).
-    if (!AGENTS[agentOverride]) {
-      throw new Error(`unknown agent "${agentOverride}" — use "claude" or "codex"`);
-    }
+  const adhoc = Boolean(agentOverride) && !requested;
+  if (adhoc) {
+    // `cldz --agent codex|claude ...` (no -P) runs the agent on its ambient login.
     stored = { type: agentOverride === 'codex' ? 'codexSubscription' : 'subscription' };
     name = `${agentOverride} (ad-hoc)`;
     resolved = { type: stored.type };
@@ -332,11 +447,18 @@ async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet
     ({ resolved, sources } = await resolveProfile(data, name));
   }
 
+  // `-P <name> --agent X` overrides the profile's default agent.
+  const agent = !adhoc && agentOverride ? agentOverride : agentOf(stored);
+
+  // Unified API profiles have their own launch path (provider × agent matrix).
+  if (stored.type === 'api') {
+    return launchApiProfile({ name, stored, agent, claudeArgs, data, quiet, dryRun });
+  }
+
   const extraEnv = buildEnv(resolved);
-  const agent = agentOf(stored);
-  const isolatedDir = agentOverride
+  const isolatedDir = adhoc
     ? null
-    : applyIsolation(extraEnv, name, stored, data.shareHistory === true);
+    : applyIsolation(extraEnv, name, stored, data.shareHistory === true, agent);
 
   // Warn if a codex profile's stored access token has expired (codex will try to
   // refresh it, but a stale token is a common cause of auth failures).

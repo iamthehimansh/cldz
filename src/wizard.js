@@ -119,6 +119,47 @@ async function promptFields(type, existing = {}) {
   return { values, hasSecret };
 }
 
+// Interactive setup for the unified `api` type (provider + key + default agent).
+async function promptApiProfile(existing = {}) {
+  const profile = { type: 'api' };
+  const provider = await tty.select('Which API provider?', [
+    { name: 'Anthropic', value: 'anthropic', hint: 'ANTHROPIC_API_KEY' },
+    { name: 'OpenAI', value: 'openai', hint: 'OPENAI_API_KEY' },
+  ]);
+  profile.provider = provider;
+  const keyEnv = provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY';
+
+  let key;
+  const envVal = process.env[keyEnv];
+  if (envVal) {
+    process.stdout.write(paint(c.green, '✓') + ` API key detected in ${paint(c.dim, '$' + keyEnv)}\n`);
+    const useEnv = await tty.confirm('  Use the value from the environment?', { defaultValue: true });
+    if (!useEnv) key = await tty.askSecret('  ' + provider + ' API key');
+  } else {
+    key = await tty.askSecret(`  ${provider} API key (Enter to read $${keyEnv} at runtime)`);
+  }
+  if (!key && existing.apiKey) key = existing.apiKey;
+
+  profile.agent = await tty.select('Default agent for this profile?', [
+    { name: 'Claude Code', value: 'claude' },
+    { name: 'Codex', value: 'codex' },
+  ]);
+
+  const native = (provider === 'anthropic' && profile.agent === 'claude') || (provider === 'openai' && profile.agent === 'codex');
+  const model = await tty.ask(
+    native ? '  Model (optional, blank = agent default)' : '  Model (required for cross-provider, e.g. gpt-4o)',
+    { defaultValue: existing.model || '' }
+  );
+  if (model) profile.model = model;
+
+  if (key) {
+    const store = await tty.confirm('Save the API key in ~/.cldz/config.json (plaintext)?', { defaultValue: true });
+    if (store) profile.apiKey = key;
+    else process.stdout.write(paint(c.dim, `  Key not saved — set $${keyEnv} before running.\n`));
+  }
+  return profile;
+}
+
 // Create or edit a profile interactively and persist it.
 // opts: { name?, type?, editing? }  -> returns the saved profile name.
 async function configureProfile(config, opts = {}) {
@@ -126,28 +167,27 @@ async function configureProfile(config, opts = {}) {
   const existing = editing ? config.profiles[opts.name] : {};
 
   const type = opts.type || (await pickType(existing.type));
-  const { values, hasSecret } = await promptFields(type, existing);
-
-  const profile = { type };
-  for (const [k, v] of Object.entries(values)) {
-    if (v !== undefined) profile[k] = v;
-  }
-
-  // Decide whether to persist any secret in plaintext.
   const def = typeDef(type);
-  const secretFields = def.fields.filter((f) => f.secret);
-  const enteredSecret = secretFields.some((f) => values[f.key] !== undefined);
 
-  if (enteredSecret) {
-    const store = await tty.confirm(
-      'Save the secret in ~/.cldz/config.json (plaintext)?',
-      { defaultValue: true }
-    );
-    if (!store) {
-      for (const f of secretFields) delete profile[f.key];
-      process.stdout.write(
-        paint(c.dim, `  Secret not saved — set $${secretFields.map((f) => f.env).join(' / $')} before running.`) + '\n'
-      );
+  let profile;
+  if (type === 'api') {
+    profile = await promptApiProfile(existing);
+  } else {
+    const { values } = await promptFields(type, existing);
+    profile = { type };
+    for (const [k, v] of Object.entries(values)) {
+      if (v !== undefined) profile[k] = v;
+    }
+    const secretFields = def.fields.filter((f) => f.secret);
+    const enteredSecret = secretFields.some((f) => values[f.key] !== undefined);
+    if (enteredSecret) {
+      const store = await tty.confirm('Save the secret in ~/.cldz/config.json (plaintext)?', { defaultValue: true });
+      if (!store) {
+        for (const f of secretFields) delete profile[f.key];
+        process.stdout.write(
+          paint(c.dim, `  Secret not saved — set $${secretFields.map((f) => f.env).join(' / $')} before running.`) + '\n'
+        );
+      }
     }
   }
 

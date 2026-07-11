@@ -26,6 +26,13 @@ function mask(val) {
   return s.slice(0, 4) + '…' + s.slice(-4);
 }
 
+function apiDetail(p) {
+  const parts = [`provider=${p.provider || '?'}`, `agent=${p.agent || '?'}`];
+  if (p.model) parts.push(`model=${p.model}`);
+  if (p.apiKey) parts.push(`apiKey=${mask(p.apiKey)}`);
+  return parts.join('  ');
+}
+
 function printProfiles(data) {
   const names = config.profileNames(data);
   if (!names.length) {
@@ -41,7 +48,7 @@ function printProfiles(data) {
     const iso = !isIsolated(p) ? '  ' + paint(c.yellow, '(shared login)') : '';
     process.stdout.write(`  ${paint(c.bold, name)}  ${agentTag} ${paint(c.dim, def.label)}${star}${iso}\n`);
     if (p.description) process.stdout.write(paint(c.dim, `      “${p.description}”\n`));
-    const detail = maskSecrets(p);
+    const detail = p.type === 'api' ? apiDetail(p) : maskSecrets(p);
     if (detail) process.stdout.write(paint(c.dim, `      ${detail}\n`));
   }
 }
@@ -207,6 +214,8 @@ function listProfiles({ json } = {}) {
           name,
           agent: agentOf(p),
           type: p.type,
+          provider: p.provider || null,
+          model: p.model || null,
           isolated: isIsolated(p),
           default: data.defaultProfile === name,
           description: p.description || null,
@@ -241,6 +250,8 @@ function showCurrent({ json } = {}) {
           profile: name,
           agent: agentOf(p),
           type: p.type,
+          provider: p.provider || null,
+          model: p.model || null,
           isolated: isIsolated(p),
           description: p.description || null,
           shareHistory: data.shareHistory === true,
