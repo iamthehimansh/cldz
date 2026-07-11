@@ -293,11 +293,14 @@ async function run({ profile: requested, claudeArgs, quiet }) {
   const agent = agentOf(stored);
   const isolatedDir = applyIsolation(extraEnv, name, stored, data.shareHistory === true);
 
+  // Per-profile default args come first so user-supplied args can override them.
+  const defaultArgs = Array.isArray(stored.args) ? stored.args : [];
+  let finalArgs = [...defaultArgs, ...claudeArgs];
+
   // Auto-add --dangerously-skip-permissions when enabled (claude only; don't dup).
-  let finalArgs = claudeArgs;
   const skipping =
-    agent === 'claude' && data.skipPermissions === true && !claudeArgs.includes(SKIP_PERMS_FLAG);
-  if (skipping) finalArgs = [SKIP_PERMS_FLAG, ...claudeArgs];
+    agent === 'claude' && data.skipPermissions === true && !finalArgs.includes(SKIP_PERMS_FLAG);
+  if (skipping) finalArgs = [SKIP_PERMS_FLAG, ...finalArgs];
 
   if (!quiet && process.stdout.isTTY) {
     const def = typeDef(resolved.type);

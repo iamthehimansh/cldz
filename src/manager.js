@@ -253,4 +253,22 @@ function showEnv(profileName) {
   }
 }
 
-module.exports = { manage, listProfiles, showCurrent, showEnv, chooseProfile };
+function shellQuote(v) {
+  return "'" + String(v).replace(/'/g, "'\\''") + "'";
+}
+
+// Raw, unmasked `export VAR=...` lines for `eval "$(cldz --print-env <name>)"`.
+// Exposes secrets in plaintext by design (that's the point of eval).
+function printEnvRaw(profileName) {
+  const data = config.load();
+  const name = profileName || data.defaultProfile || config.profileNames(data)[0];
+  if (!name || !data.profiles[name]) throw new Error('no profile configured. Run: cldz --config');
+  const p = data.profiles[name];
+  const env = buildEnv({ ...p });
+  if (isIsolated(p)) env[agentDef(agentOf(p)).configDirEnv] = sessionDir(name, p);
+  for (const [k, v] of Object.entries(env)) {
+    process.stdout.write(`export ${k}=${shellQuote(v)}\n`);
+  }
+}
+
+module.exports = { manage, listProfiles, showCurrent, showEnv, printEnvRaw, chooseProfile };

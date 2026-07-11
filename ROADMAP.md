@@ -66,8 +66,9 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - [x] `cldz --use <name>` quick default switch (v0.3.0)
 - [x] `cldz --list --json` for scripting (v0.3.0)
 - [x] import existing auth (detect ANTHROPIC_API_KEY / OPENAI_API_KEY / ~/.codex / ~/.claude) on first run (v0.4.0)
+- [x] `cldz --print-env` shell-eval mode (raw exports, no masking) (v0.5.0)
+- [x] per-profile default args/model (wizard `args` field, prepended before user args) (v0.5.0)
 - [ ] `cldz --agent codex ...` shortcut (launch codex without a codex profile)
-- [ ] `cldz --print-env`/shell eval mode (raw exports, no masking, for `eval "$(...)"`)
 - [ ] warn when a stored codex access_token is expired (decode JWT exp)
 
 ## Feature brainstorm (backlog — refine & implement top items)
@@ -89,7 +90,7 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - 0.1.3 — skip-permissions setting (published ✅)
 - 0.2.0 — multi-agent (claude+codex) + subscription profiles (pushed to git; NOT on npm — token expired)
 - 0.3.0 — --current/--whoami, --use, --list --json; Phase 2 verified (git only; npm paused)
-- 0.4.0 — first-run credential auto-import; Phase 3 (Switchyard subscription bridge) researched & BLOCKED/won't-fix (git only)
+- 0.5.0 — --print-env (eval mode) + per-profile default args (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

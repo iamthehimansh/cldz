@@ -90,8 +90,16 @@ cldz --list                  # list saved profiles
 cldz --set-default work       # set the default profile
 cldz --remove old             # delete a profile
 cldz --env work               # show the env vars a profile sets (secrets masked)
+cldz --print-env work         # raw exports for: eval "$(cldz --print-env work)"
+cldz --current                # show the active profile + settings (alias --whoami)
+cldz --use work               # set the default profile
+cldz --list --json            # machine-readable profile list
 cldz --doctor                 # check your setup
 ```
+
+Each profile can also carry **default args** always passed to the agent (set in
+the wizard, e.g. `--model opus`); args you pass on the command line are appended
+and take precedence.
 
 The `--config` menu lets you add multiple named profiles, edit them, delete them,
 rename them, and choose which one is the default.

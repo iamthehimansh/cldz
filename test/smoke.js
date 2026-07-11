@@ -211,6 +211,20 @@ check(
   r.stdout + r.stderr
 );
 
+// 20. per-profile default args are prepended (and user args appended)
+writeConfig({ version: 1, defaultProfile: 'm', profiles: { m: { type: 'apiKey', apiKey: 'k', args: ['--model', 'opus'] } } });
+r = run(['hi'], { env: { CLDZ_CLAUDE_BIN: shim } });
+check('per-profile default args are passed before user args', /args=--model\|opus\|hi/.test(r.stdout), r.stdout + r.stderr);
+
+// 21. --print-env emits raw unmasked exports for eval
+writeConfig({ version: 1, defaultProfile: 'k', profiles: { k: { type: 'apiKey', apiKey: 'sk-ant-RAWVALUE' } } });
+r = run(['--print-env', 'k']);
+check(
+  '--print-env emits raw unmasked export lines',
+  /export ANTHROPIC_API_KEY='sk-ant-RAWVALUE'/.test(r.stdout) && /export CLAUDE_CONFIG_DIR=/.test(r.stdout),
+  r.stdout + r.stderr
+);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

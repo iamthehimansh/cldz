@@ -33,6 +33,7 @@ ${b('MANAGEMENT')}
   cldz --use <name>               Set the default profile (alias --set-default)
   cldz --remove <name>            Delete a profile
   cldz --env [name]               Print the env vars a profile sets (secrets masked)
+  cldz --print-env [name]         Raw exports for eval "$(cldz --print-env)" (unmasked)
   cldz --doctor                   Check your setup
   cldz --help                     Show this help
   cldz --version                  Show version
@@ -126,6 +127,8 @@ function parse(argv) {
       return { command: 'list', json: rest.includes('--json') };
     case '--env':
       return { command: 'env', profile: argv[1] };
+    case '--print-env':
+      return { command: 'print-env', profile: argv[1] };
     case '--doctor':
       return { command: 'doctor' };
     case '--set-default':
@@ -172,6 +175,8 @@ async function main(argv) {
       return manager.showCurrent();
     case 'env':
       return manager.showEnv(parsed.profile);
+    case 'print-env':
+      return manager.printEnvRaw(parsed.profile);
     case 'set-default': {
       if (!parsed.name) throw new Error('usage: cldz --set-default <name>');
       const data = config.load();

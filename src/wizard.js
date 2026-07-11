@@ -166,6 +166,13 @@ async function configureProfile(config, opts = {}) {
     else profile.isolate = false;
   }
 
+  // Optional default args always passed to the agent (e.g. "--model opus").
+  const argsStr = await tty.ask('Default args to always pass (optional, e.g. --model opus)', {
+    defaultValue: Array.isArray(existing.args) ? existing.args.join(' ') : '',
+  });
+  if (argsStr && argsStr.trim()) profile.args = argsStr.trim().split(/\s+/);
+  else delete profile.args;
+
   let name = opts.name;
   if (!name) {
     const suggested = suggestName(config, type);
