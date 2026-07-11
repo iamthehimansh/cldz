@@ -195,7 +195,7 @@ async function manage() {
     }
   }
 
-  process.stdout.write(paint(c.dim, 'Saved. Run `cldz` to launch Claude Code.\n'));
+  process.stdout.write(paint(c.dim, 'Saved. Run `cldz` to launch your default profile.\n'));
   tty.close(); // release stdin so the process exits after "Save & exit"
 }
 

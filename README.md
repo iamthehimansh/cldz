@@ -141,6 +141,19 @@ existing `~/.claude` / `~/.codex` login. (Token/API-key profiles are always
 isolated.) An isolated subscription profile shows the agent's normal login screen
 on first launch so you can sign into that account.
 
+To sign in explicitly (e.g. before your first real run), use:
+
+```bash
+cldz --login -P work-codex     # runs the agent's native login in that profile's dir
+                               # (codex → `codex login`; claude → its login screen)
+```
+
+`cldz` never stores your session tokens — each account signs in through the
+agent's own OAuth into that profile's config dir. If you'd rather seed a profile
+from credentials you already have, its dir is `~/.cldz/sessions/<profile>/`
+(`cldz --dry-run -P <profile>` prints it) — you can place the agent's own
+`auth.json` there yourself; cldz won't prompt for or hold those tokens.
+
 ## Session isolation
 
 By default, each profile launches `claude` with its **own** `CLAUDE_CONFIG_DIR`

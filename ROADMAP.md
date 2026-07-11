@@ -152,6 +152,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.13.0 — unified `api` type (provider+agent) with Switchyard auto-proxy for cross-provider; --agent overrides profile agent (git only; npm paused)
 - 0.14.0 — multiple isolated accounts for subscription types (Codex + Claude); wizard offers separate login; no onboarding-seed for isolated subscriptions (git only; npm paused)
 - 0.14.1 — codex shared history now also links session_index.jsonl so cross-profile chats show in the codex resume picker (git only; npm paused)
+- 0.15.0 — cldz --login (native per-profile sign-in, no token storage); config message no longer hardcodes Claude Code (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

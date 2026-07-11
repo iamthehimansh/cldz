@@ -3,7 +3,7 @@
 const { execFileSync } = require('node:child_process');
 const config = require('./config.js');
 const manager = require('./manager.js');
-const { run } = require('./run.js');
+const { run, login } = require('./run.js');
 const tty = require('./tty.js');
 const { paint, colors: c } = tty;
 
@@ -37,6 +37,7 @@ ${b('USAGE')}
   cldz [claude args...]           Launch Claude Code with your default profile
   cldz -P <name> [claude args]    Launch using a specific profile
   cldz --agent codex [args]       Launch an agent ad-hoc on its ambient login (claude|codex)
+  cldz --login -P <name>          Sign in to a profile's account (native login in its own dir)
   cldz --dry-run [-P name]        Print what would launch (agent, command, env) without running
   cldz -- <claude args>           Force everything through to claude (e.g. -- --help)
 
@@ -272,6 +273,8 @@ function parse(argv) {
     case '--set-default':
     case '--use':
       return { command: 'set-default', name: argv[1] };
+    case '--login':
+      return { command: 'login', profile };
     case '--current':
     case '--whoami':
       return { command: 'current', json: rest.includes('--json') };
@@ -322,6 +325,8 @@ async function main(argv) {
       return manager.manage();
     case 'list':
       return manager.listProfiles({ json: parsed.json });
+    case 'login':
+      return login({ profile: parsed.profile });
     case 'current':
       return manager.showCurrent({ json: parsed.json });
     case 'env':

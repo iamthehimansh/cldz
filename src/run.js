@@ -427,6 +427,45 @@ function launchApiProfile({ name, stored, agent, claudeArgs, data, quiet, dryRun
   else launchViaSwitchyard(agent, provider, key, stored.model, finalArgs, extraEnv);
 }
 
+// `cldz --login -P <name>`: run the agent's native login in the profile's own
+// dir, so an isolated profile can sign into its (separate) account. No tokens are
+// stored by cldz — the agent does its own OAuth into its config dir.
+async function login({ profile: requested }) {
+  const data = config.load();
+  const name = await determineProfile(data, requested);
+  const stored = data.profiles[name];
+  const agent = agentOf(stored);
+  const agDef = agentDef(agent);
+
+  const extraEnv = {};
+  let dir = null;
+  if (isIsolated(stored)) {
+    dir = sessionDir(name, stored);
+    fs.mkdirSync(dir, { recursive: true });
+    extraEnv[agDef.configDirEnv] = dir;
+  }
+  process.stderr.write(
+    paint(c.dim, `cldz › signing in to ${agDef.label} for profile "${name}" ${dir ? 'in ' + dir : '(shared login)'}\n`)
+  );
+  tty.close();
+  const bin = process.env[agDef.binEnv] || agDef.bin;
+  // codex has a dedicated `login`; claude signs in when launched in a fresh dir.
+  const args = agent === 'codex' ? ['login'] : [];
+  const child = spawn(bin, args, { stdio: 'inherit', env: { ...process.env, ...extraEnv }, shell: process.platform === 'win32' });
+  child.on('error', (err) => {
+    if (err.code === 'ENOENT') {
+      console.error(`cldz: could not find "${bin}". Install ${agDef.label} first:\n  ${agDef.installHint}`);
+      process.exit(127);
+    }
+    console.error(`cldz: login failed — ${err.message}`);
+    process.exit(1);
+  });
+  child.on('exit', (code, signal) => {
+    if (signal) process.kill(process.pid, signal);
+    else process.exit(code == null ? 0 : code);
+  });
+}
+
 // Entry point for the "run" path.
 async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet, dryRun }) {
   const data = config.load();
@@ -518,6 +557,7 @@ async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet
 
 module.exports = {
   run,
+  login,
   resolveProfile,
   determineProfile,
   launchClaude,

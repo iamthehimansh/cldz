@@ -531,6 +531,15 @@ check(
   'seed file unexpectedly present'
 );
 
+// 48. --login runs the agent's native login in the profile's own dir
+writeConfig({ version: 2, defaultProfile: 'wc', profiles: { wc: { type: 'codexSubscription', isolate: true } } });
+r = run(['--login', '-P', 'wc'], { env: { CLDZ_CODEX_BIN: codexShim } });
+check(
+  '--login runs `codex login` with the profile isolated CODEX_HOME',
+  /args=login/.test(r.stdout) && r.stdout.includes(path.join('sessions', 'wc')),
+  r.stdout + r.stderr
+);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {
