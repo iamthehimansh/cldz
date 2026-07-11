@@ -366,6 +366,10 @@ for (const sh of ['bash', 'zsh', 'fish']) {
 }
 r = run(['--completion', 'nope']);
 check('--completion rejects an unknown shell', r.status !== 0 && /bash\|zsh\|fish/.test(r.stderr), r.stdout + r.stderr);
+// completion must cover the newer flags (keeps it in sync with the CLI)
+r = run(['--completion', 'bash']);
+const covers = ['--export', '--import', '--path', '--dry-run', '--desc', '--current', '--agent'].every((f) => r.stdout.includes(f));
+check('--completion covers the newer flags', covers, r.stdout);
 
 // 36. --profile-names lists profile names (used by completion)
 writeConfig({ version: 2, defaultProfile: 'a', profiles: { a: { type: 'subscription' }, b: { type: 'subscription' } } });

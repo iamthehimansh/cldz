@@ -4,8 +4,10 @@
 const FLAGS = [
   '--config', '--list', '--current', '--whoami', '--use', '--set-default',
   '--add', '--edit', '--rename', '--remove', '--env', '--print-env',
-  '--doctor', '--agent', '--profile', '--dry-run', '--completion',
-  '--version', '--help', '--json', '--all', '--default', '--type', '--set', '--unset', '--args',
+  '--doctor', '--path', '--export', '--import', '--agent', '--profile',
+  '--dry-run', '--completion', '--version', '--help',
+  '--json', '--all', '--default', '--with-secrets', '--force',
+  '--type', '--set', '--unset', '--args', '--desc',
 ];
 const TYPES = ['subscription', 'apiKey', 'oauth', 'gateway', 'bedrock', 'vertex', 'codexSubscription', 'codexApiKey'];
 // Flags whose value is a profile name.

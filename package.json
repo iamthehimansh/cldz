@@ -1,6 +1,6 @@
 {
   "name": "cldzz",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "One-command launcher for Claude Code and Codex — pick an agent + auth (subscription / API key / OAuth / gateway / Bedrock / Vertex / OpenAI) once and just run cldz.",
   "type": "commonjs",
   "bin": {
