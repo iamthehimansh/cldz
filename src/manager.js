@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const config = require('./config.js');
 const { typeDef, buildEnv, agentOf } = require('./auth.js');
 const { agentDef } = require('./agents.js');
@@ -292,4 +293,80 @@ function printEnvRaw(profileName) {
   }
 }
 
-module.exports = { manage, listProfiles, showCurrent, showEnv, printEnvRaw, chooseProfile };
+// Build an exportable snapshot. Secrets are omitted unless withSecrets.
+function buildExport(data, withSecrets) {
+  const out = {
+    version: config.CONFIG_VERSION,
+    defaultProfile: data.defaultProfile || null,
+    shareHistory: data.shareHistory === true,
+    skipPermissions: data.skipPermissions === true,
+    profiles: {},
+  };
+  for (const [name, p] of Object.entries(data.profiles)) {
+    const secretKeys = new Set(typeDef(p.type).fields.filter((f) => f.secret).map((f) => f.key));
+    const clean = {};
+    for (const [k, v] of Object.entries(p)) {
+      if (secretKeys.has(k) && !withSecrets) continue;
+      clean[k] = v;
+    }
+    out.profiles[name] = clean;
+  }
+  return out;
+}
+
+function exportConfig({ file, withSecrets } = {}) {
+  const data = config.load();
+  const json = JSON.stringify(buildExport(data, withSecrets), null, 2) + '\n';
+  if (!file) {
+    process.stdout.write(json);
+    return;
+  }
+  fs.writeFileSync(file, json, { mode: 0o600 });
+  const n = config.profileNames(data).length;
+  process.stdout.write(
+    paint(c.green, `✓ Exported ${n} profile(s) to ${file}`) +
+      (withSecrets ? paint(c.yellow, ' (includes secrets — keep it safe!)') : paint(c.dim, ' (secrets omitted)')) +
+      '\n'
+  );
+}
+
+// Merge profiles from a file. Existing profiles are skipped unless force.
+// Global settings: shareHistory is restored; skipPermissions is NOT auto-enabled
+// via import (safety — it must be turned on explicitly).
+function importConfig({ file, force } = {}) {
+  if (!file) throw new Error('usage: cldz --import <file> [--force]');
+  let incoming;
+  try {
+    incoming = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (e) {
+    throw new Error(`cannot read import file "${file}": ${e.message}`);
+  }
+  if (!incoming || typeof incoming !== 'object' || !incoming.profiles || typeof incoming.profiles !== 'object') {
+    throw new Error('import file has no "profiles" object');
+  }
+  const data = config.load();
+  let added = 0;
+  let replaced = 0;
+  let skipped = 0;
+  for (const [name, p] of Object.entries(incoming.profiles)) {
+    if (data.profiles[name] && !force) {
+      skipped++;
+      continue;
+    }
+    if (data.profiles[name]) replaced++;
+    else added++;
+    data.profiles[name] = p;
+  }
+  if (!data.defaultProfile && incoming.defaultProfile && data.profiles[incoming.defaultProfile]) {
+    data.defaultProfile = incoming.defaultProfile;
+  }
+  if (typeof incoming.shareHistory === 'boolean') data.shareHistory = incoming.shareHistory;
+  config.save(data);
+  process.stdout.write(
+    paint(c.green, `✓ Imported: ${added} added, ${replaced} replaced, ${skipped} skipped`) +
+      (skipped ? paint(c.dim, ' (use --force to overwrite existing)') : '') +
+      '\n'
+  );
+}
+
+module.exports = { manage, listProfiles, showCurrent, showEnv, printEnvRaw, exportConfig, importConfig, chooseProfile };

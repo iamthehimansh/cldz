@@ -53,6 +53,8 @@ ${b('MANAGEMENT')}
   cldz --env [name]               Print the env vars a profile sets (secrets masked)
   cldz --print-env [name]         Raw exports for eval "$(cldz --print-env)" (unmasked)
   cldz --doctor                   Check your setup
+  cldz --export [file]            Back up config (secrets omitted; --with-secrets to include)
+  cldz --import <file> [--force]  Restore/merge profiles from a backup
   cldz --completion bash|zsh|fish Print a shell-completion script
   cldz --help                     Show this help
   cldz --version [--all]          Show version (--all: also claude + codex)
@@ -233,6 +235,10 @@ function parse(argv) {
       return { command: 'completion', shell: argv[1] };
     case '--profile-names':
       return { command: 'profile-names' };
+    case '--export':
+      return { command: 'export', file: argv.slice(1).find((a) => !a.startsWith('-')), withSecrets: argv.includes('--with-secrets') };
+    case '--import':
+      return { command: 'import', file: argv.slice(1).find((a) => !a.startsWith('-')), force: argv.includes('--force') };
     case '--set-default':
     case '--use':
       return { command: 'set-default', name: argv[1] };
@@ -276,6 +282,10 @@ async function main(argv) {
       process.stdout.write(config.profileNames(data).join('\n') + '\n');
       return;
     }
+    case 'export':
+      return manager.exportConfig({ file: parsed.file, withSecrets: parsed.withSecrets });
+    case 'import':
+      return manager.importConfig({ file: parsed.file, force: parsed.force });
     case 'config':
       return manager.manage();
     case 'list':

@@ -372,6 +372,47 @@ writeConfig({ version: 2, defaultProfile: 'a', profiles: { a: { type: 'subscript
 r = run(['--profile-names']);
 check('--profile-names lists names one per line', r.stdout.trim().split('\n').sort().join(',') === 'a,b', r.stdout + r.stderr);
 
+// 37. --export omits secrets by default; --with-secrets includes them
+writeConfig({ version: 2, defaultProfile: 'k', shareHistory: true, profiles: { k: { type: 'apiKey', apiKey: 'sk-ant-SECRET', args: ['--model', 'opus'] } } });
+r = run(['--export']);
+let exp = null;
+try { exp = JSON.parse(r.stdout); } catch { /* null */ }
+check(
+  '--export omits secrets but keeps non-secret fields',
+  exp && exp.profiles.k && exp.profiles.k.apiKey === undefined &&
+    JSON.stringify(exp.profiles.k.args) === JSON.stringify(['--model', 'opus']) &&
+    exp.shareHistory === true,
+  r.stdout + r.stderr
+);
+r = run(['--export', '--with-secrets']);
+let expS = null;
+try { expS = JSON.parse(r.stdout); } catch { /* null */ }
+check('--export --with-secrets includes the secret', expS && expS.profiles.k.apiKey === 'sk-ant-SECRET', r.stdout + r.stderr);
+
+// 38. --import merges profiles (skips existing without --force, replaces with)
+const impFile = path.join(home, 'backup.json');
+fs.writeFileSync(impFile, JSON.stringify({ version: 2, defaultProfile: 'new1', profiles: { k: { type: 'subscription' }, new1: { type: 'codexSubscription' } } }));
+writeConfig({ version: 2, defaultProfile: 'k', profiles: { k: { type: 'apiKey', apiKey: 'keep' } } });
+r = run(['--import', impFile]);
+let afterImp = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
+check(
+  '--import adds new profiles and skips existing without --force',
+  afterImp.profiles.new1 && afterImp.profiles.k.apiKey === 'keep' && /1 added, 0 replaced, 1 skipped/.test(r.stdout),
+  r.stdout + r.stderr
+);
+r = run(['--import', impFile, '--force']);
+afterImp = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
+check('--import --force overwrites existing profiles', afterImp.profiles.k.type === 'subscription' && afterImp.profiles.k.apiKey === undefined, r.stdout + r.stderr);
+
+// 39. round-trip: export --with-secrets then import into a fresh config restores it
+writeConfig({ version: 2, defaultProfile: 'k', profiles: { k: { type: 'apiKey', apiKey: 'sk-rt' } } });
+const rtFile = path.join(home, 'rt.json');
+run(['--export', rtFile, '--with-secrets']);
+fs.rmSync(path.join(home, 'config.json'), { force: true });
+run(['--import', rtFile]);
+const rt = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
+check('export --with-secrets round-trips through import', rt.profiles.k && rt.profiles.k.apiKey === 'sk-rt' && rt.defaultProfile === 'k', JSON.stringify(rt));
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {
