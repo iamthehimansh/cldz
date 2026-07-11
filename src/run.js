@@ -168,7 +168,11 @@ function applyIsolation(extraEnv, name, stored, shareHistory, agentName) {
   if (process.env[cfgEnv]) return process.env[cfgEnv]; // env override wins
   const dir = sessionDir(name, stored);
   fs.mkdirSync(dir, { recursive: true });
-  if (agentDef(agent).seedOnboarding) seedOnboarding(dir);
+  // Seed onboarding only when a credential is injected (so claude skips the login
+  // screen and uses the token). For a subscription profile there is no token —
+  // we WANT the login screen so a separate account can sign in.
+  const injectsCredential = typeDef(stored.type).defaultIsolate !== false;
+  if (agentDef(agent).seedOnboarding && injectsCredential) seedOnboarding(dir);
   if (shareHistory) linkSharedHistory(dir, agent);
   extraEnv[cfgEnv] = dir;
   return dir;

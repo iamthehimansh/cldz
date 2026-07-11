@@ -504,6 +504,30 @@ writeConfig({ version: 2, defaultProfile: 'a', profiles: { a: { type: 'api', pro
 r = run([], { env: { CLDZ_CLAUDE_BIN: shim, ANTHROPIC_API_KEY: 'sk-ant-FROMENV2' } });
 check('api reads the key from env when not stored', /FAKE key=sk-ant-FROMENV2/.test(r.stdout), r.stdout + r.stderr);
 
+// 46. multiple isolated Codex accounts get their own CODEX_HOME (like Claude)
+writeConfig({
+  version: 2,
+  defaultProfile: 'a',
+  profiles: {
+    a: { type: 'codexSubscription', isolate: true },
+    b: { type: 'codexSubscription', isolate: true },
+  },
+});
+r = run(['-P', 'a'], { env: { CLDZ_CODEX_BIN: codexShim } });
+check('isolated codex account A gets its own CODEX_HOME', r.stdout.includes(path.join('sessions', 'a')), r.stdout + r.stderr);
+r = run(['-P', 'b'], { env: { CLDZ_CODEX_BIN: codexShim } });
+check('isolated codex account B gets a different CODEX_HOME', r.stdout.includes(path.join('sessions', 'b')), r.stdout + r.stderr);
+
+// 47. an isolated SUBSCRIPTION profile is not onboarding-seeded (so the new
+//     account's login screen actually shows), unlike an isolated token profile
+writeConfig({ version: 2, defaultProfile: 'subacct', profiles: { subacct: { type: 'subscription', isolate: true } } });
+run(['-P', 'subacct'], { env: { CLDZ_CLAUDE_BIN: shim, HOME: importHome, USERPROFILE: importHome } });
+check(
+  'isolated subscription profile is NOT onboarding-seeded (login shows for the new account)',
+  !fs.existsSync(path.join(home, 'sessions', 'subacct', '.claude.json')),
+  'seed file unexpectedly present'
+);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

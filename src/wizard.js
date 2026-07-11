@@ -191,12 +191,21 @@ async function configureProfile(config, opts = {}) {
     }
   }
 
-  // Isolation: keep this profile's session (and its credential) separate from the
-  // agent's main login. Subscription-style types always share the ambient login
-  // (there's nothing to inject), so we don't ask.
+  // Isolation. Subscription-style types default to your existing login, but can
+  // instead be a SEPARATE isolated account (its own CLAUDE_CONFIG_DIR / CODEX_HOME
+  // with its own login) — that's how you run multiple accounts side by side.
   if (def.defaultIsolate === false) {
-    profile.isolate = false;
-    process.stdout.write(paint(c.dim, '  Uses your existing login (shared, not isolated).\n'));
+    const separate = await tty.confirm(
+      'Use a SEPARATE login for this profile (a different account)? (No = your existing login)',
+      { defaultValue: existing.isolate === true }
+    );
+    if (separate) {
+      profile.isolate = true;
+      process.stdout.write(paint(c.dim, '  You’ll sign in to this account on first launch (own session dir).\n'));
+    } else {
+      profile.isolate = false;
+      process.stdout.write(paint(c.dim, '  Uses your existing login (shared).\n'));
+    }
   } else {
     const isolate = await tty.confirm(
       'Keep this profile isolated from your main login (recommended)?',

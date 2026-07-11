@@ -121,6 +121,26 @@ rename them, and choose which one is the default.
   ANTHROPIC_API_KEY=sk-ant-xxxx cldz -P work
   ```
 
+## Multiple accounts
+
+Run several accounts of the same agent side by side — each profile gets its own
+isolated session dir (`CLAUDE_CONFIG_DIR` for Claude, `CODEX_HOME` for Codex) with
+its **own login**:
+
+```bash
+# two separate ChatGPT/Codex accounts:
+cldz --add work-codex --type codexSubscription --set isolate=true --desc "work"
+cldz --add personal-codex --type codexSubscription --set isolate=true --desc "personal"
+cldz -P work-codex        # first launch: sign in to the work account (own CODEX_HOME)
+cldz -P personal-codex    # separate account, separate history
+```
+
+The wizard (`cldz --config` → Add) asks *"use a separate login for this profile?"*
+for subscription types — answer yes for a distinct account, no to share your
+existing `~/.claude` / `~/.codex` login. (Token/API-key profiles are always
+isolated.) An isolated subscription profile shows the agent's normal login screen
+on first launch so you can sign into that account.
+
 ## Session isolation
 
 By default, each profile launches `claude` with its **own** `CLAUDE_CONFIG_DIR`
