@@ -309,6 +309,25 @@ check(
   r.stdout + r.stderr
 );
 
+// 31. --dry-run prints the plan without launching (no FAKE/CODEX output)
+writeConfig({ version: 1, defaultProfile: 'k', profiles: { k: { type: 'apiKey', apiKey: 'sk-ant-DRY', args: ['--model', 'opus'] } } });
+r = run(['--dry-run', 'hello'], { env: { CLDZ_CLAUDE_BIN: shim } });
+check(
+  '--dry-run prints the launch plan and does not launch',
+  /agent:\s+Claude Code/.test(r.stdout) && /command:.*--model opus hello/.test(r.stdout) && !/FAKE/.test(r.stdout),
+  r.stdout + r.stderr
+);
+check('--dry-run masks secret env values', /ANTHROPIC_API_KEY=/.test(r.stdout) && !r.stdout.includes('sk-ant-DRY'), r.stdout + r.stderr);
+
+// 32. doctor reports per-profile credential readiness
+writeConfig({ version: 1, defaultProfile: 'ready', profiles: { ready: { type: 'apiKey', apiKey: 'k' }, missing: { type: 'oauth' } } });
+r = run(['--doctor'], { env: { HOME: importHome, USERPROFILE: importHome, ANTHROPIC_API_KEY: '', CLAUDE_CODE_OAUTH_TOKEN: '' } });
+check(
+  'doctor shows per-profile credential readiness',
+  /ready: credentials resolve/.test(r.stdout) && /missing: missing \$CLAUDE_CODE_OAUTH_TOKEN/.test(r.stdout),
+  r.stdout + r.stderr
+);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

@@ -20,6 +20,28 @@ function isIsolated(stored) {
   return typeDef(stored.type).defaultIsolate !== false;
 }
 
+// Non-interactive check of whether a profile's required credentials resolve
+// (from config or the current environment). Subscription types are always ready.
+function profileReadiness(stored) {
+  const def = typeDef(stored.type);
+  const missing = [];
+  for (const field of def.fields) {
+    if (field.optional) continue;
+    const envVal = process.env[field.env];
+    const has =
+      (envVal !== undefined && envVal !== '') ||
+      (stored[field.key] !== undefined && stored[field.key] !== '');
+    if (!has) missing.push('$' + field.env);
+  }
+  return { ready: missing.length === 0, missing };
+}
+
+function maskValue(v) {
+  const s = String(v);
+  if (s.length <= 8) return '••••';
+  return s.slice(0, 4) + '…' + s.slice(-4);
+}
+
 // Where an isolated profile keeps its own Claude Code config/credentials.
 function sessionDir(name, stored) {
   return stored.configDir || path.join(configDir(), 'sessions', name);
@@ -285,7 +307,7 @@ const launchClaude = (args, env) => launchAgent('claude', args, env);
 const SKIP_PERMS_FLAG = '--dangerously-skip-permissions';
 
 // Entry point for the "run" path.
-async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet }) {
+async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet, dryRun }) {
   const data = config.load();
 
   let name;
@@ -347,6 +369,22 @@ async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet
     );
   }
 
+  if (dryRun) {
+    const envKeys = Object.keys(extraEnv);
+    const envStr = envKeys.length
+      ? envKeys.map((k) => `${k}=${/TOKEN|KEY/.test(k) ? maskValue(extraEnv[k]) : extraEnv[k]}`).join(' ')
+      : '(none)';
+    const bin = process.env[agentDef(agent).binEnv] || agentDef(agent).bin;
+    process.stdout.write(
+      `agent:      ${agentDef(agent).label}\n` +
+        `profile:    ${name} (${resolved.type})\n` +
+        `command:    ${bin} ${finalArgs.join(' ')}\n` +
+        `config dir: ${isolatedDir || '(ambient login)'}\n` +
+        `env:        ${envStr}\n`
+    );
+    return;
+  }
+
   launchAgent(agent, finalArgs, extraEnv);
 }
 
@@ -360,4 +398,5 @@ module.exports = {
   applyIsolation,
   linkSharedHistory,
   isIsolated,
+  profileReadiness,
 };

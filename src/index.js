@@ -37,6 +37,7 @@ ${b('USAGE')}
   cldz [claude args...]           Launch Claude Code with your default profile
   cldz -P <name> [claude args]    Launch using a specific profile
   cldz --agent codex [args]       Launch an agent ad-hoc on its ambient login (claude|codex)
+  cldz --dry-run [-P name]        Print what would launch (agent, command, env) without running
   cldz -- <claude args>           Force everything through to claude (e.g. -- --help)
 
 ${b('MANAGEMENT')}
@@ -111,8 +112,16 @@ function doctor() {
   if (!names.length) {
     process.stdout.write(warn('no profiles configured yet — run: cldz --config') + '\n');
   } else {
-    process.stdout.write(ok(`${names.length} profile(s): ${names.join(', ')}`) + '\n');
-    process.stdout.write(ok(`default profile: ${data.defaultProfile || '(none)'}`) + '\n');
+    process.stdout.write(ok(`${names.length} profile(s), default: ${data.defaultProfile || '(none)'}`) + '\n');
+    const { profileReadiness } = require('./run.js');
+    for (const n of names) {
+      const rd = profileReadiness(data.profiles[n]);
+      if (rd.ready) {
+        process.stdout.write('  ' + ok(`${n}: credentials resolve`) + '\n');
+      } else {
+        process.stdout.write('  ' + warn(`${n}: missing ${rd.missing.join(', ')} (set it or store it in the profile)`) + '\n');
+      }
+    }
   }
   process.stdout.write(paint(c.dim, `config: ${config.configPath()}\n`));
 }
@@ -174,6 +183,7 @@ function parse(argv) {
   // before `--`.
   let profile = process.env.CLDZ_PROFILE || undefined;
   let agent;
+  let dryRun = false;
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -181,6 +191,10 @@ function parse(argv) {
       // Everything after is passthrough; keep the marker so we can strip it later.
       rest.push(...argv.slice(i));
       break;
+    }
+    if (a === '--dry-run') {
+      dryRun = true;
+      continue;
     }
     if (a === '--profile' || a === '-P') {
       profile = argv[++i];
@@ -237,7 +251,7 @@ function parse(argv) {
   let claudeArgs = rest;
   const dd = claudeArgs.indexOf('--');
   if (dd !== -1) claudeArgs = [...claudeArgs.slice(0, dd), ...claudeArgs.slice(dd + 1)];
-  return { command: 'run', profile, agent, claudeArgs };
+  return { command: 'run', profile, agent, dryRun, claudeArgs };
 }
 
 async function main(argv) {
@@ -334,7 +348,12 @@ async function main(argv) {
     }
     case 'run':
     default:
-      return run({ profile: parsed.profile, agent: parsed.agent, claudeArgs: parsed.claudeArgs || [] });
+      return run({
+        profile: parsed.profile,
+        agent: parsed.agent,
+        dryRun: parsed.dryRun,
+        claudeArgs: parsed.claudeArgs || [],
+      });
   }
 }
 

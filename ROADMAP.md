@@ -78,6 +78,8 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - [x] `--edit <name>` non-interactive field updates (--type/--set/--unset/--args/--default) (v0.8.0)
 - [x] `--current --json` (machine-readable active profile) (v0.8.0)
 - [x] `--version --all` (also prints claude + codex versions) (v0.8.0)
+- [x] `doctor` per-profile credential-resolves check (v0.9.0)
+- [x] `cldz --dry-run` prints the launch plan (agent, command, config dir, masked env) without launching (v0.9.0)
 - [ ] Config schema versioning/migration (bump `version`, migrate old shapes safely).
 - [ ] Shell completion: `cldz --completion bash|zsh|fish` prints a completion script.
 - [ ] `cldz --version --all` also prints claude + codex versions.
@@ -101,6 +103,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.6.0 — --agent ad-hoc shortcut + codex token-expiry warning; Phase 4 complete (git only; npm paused)
 - 0.7.0 — non-interactive --add / --rename profile mgmt (git only; npm paused)
 - 0.8.0 — --edit + --current --json + --version --all (git only; npm paused)
+- 0.9.0 — doctor per-profile credential check + --dry-run (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep
