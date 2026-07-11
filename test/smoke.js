@@ -460,6 +460,16 @@ for (const cmd of roCmds) {
 }
 check('all read-only commands exit 0 on an empty config', roOk, roBad);
 
+// 44. --config "Save & exit" exits cleanly instead of hanging on stdin
+writeConfig({ version: 2, defaultProfile: 'a', profiles: { a: { type: 'subscription' } } });
+const cfgRun = spawnSync(process.execPath, [CLI, '--config'], {
+  encoding: 'utf8',
+  env: baseEnv,
+  input: '8\n', // "Save & exit" is menu option 8
+  timeout: 8000,
+});
+check('--config exits cleanly on Save & exit (no hang)', cfgRun.status === 0 && !cfgRun.signal, 'status=' + cfgRun.status + ' signal=' + cfgRun.signal);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

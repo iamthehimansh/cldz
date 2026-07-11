@@ -189,6 +189,7 @@ async function manage() {
   }
 
   process.stdout.write(paint(c.dim, 'Saved. Run `cldz` to launch Claude Code.\n'));
+  tty.close(); // release stdin so the process exits after "Save & exit"
 }
 
 // Non-interactive helpers used by subcommands.
