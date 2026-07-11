@@ -68,6 +68,7 @@ isolated). Everything else isolates per profile by default.
 cldz                         # launch with your default profile
 cldz -P work                 # launch with the "work" profile
 cldz -P work "fix the bug"   # extra args pass straight to claude
+cldz --agent codex "..."          # run codex ad-hoc on its login (no profile)
 cldz --dangerously-skip-permissions   # any claude flag passes through
 cldz -- --help               # force everything after -- through to claude
 ```

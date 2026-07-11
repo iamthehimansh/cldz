@@ -68,16 +68,20 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - [x] import existing auth (detect ANTHROPIC_API_KEY / OPENAI_API_KEY / ~/.codex / ~/.claude) on first run (v0.4.0)
 - [x] `cldz --print-env` shell-eval mode (raw exports, no masking) (v0.5.0)
 - [x] per-profile default args/model (wizard `args` field, prepended before user args) (v0.5.0)
-- [ ] `cldz --agent codex ...` shortcut (launch codex without a codex profile)
-- [ ] warn when a stored codex access_token is expired (decode JWT exp)
+- [x] `cldz --agent codex|claude ...` shortcut — launch an agent ad-hoc on its ambient login (v0.6.0)
+- [x] warn when a stored codex access_token is expired (decode JWT exp; shown in doctor + at launch) (v0.6.0)
 
-## Feature brainstorm (backlog — refine & implement top items)
-- Detect & offer to import creds already in env or ~/.codex/~/.claude on first run.
-- `cldz ls --json` for scripting.
-- Per-profile default model / args (e.g. always `--model opus`).
-- `cldz whoami` — show which account/profile a token maps to.
-- Quick switch: `cldz use <profile>` sets default.
-- Health: warn when a stored codex access_token is expired (check exp in JWT).
+**Phase 4 COMPLETE.** Next: brainstormed features (see below), each with a smoke test.
+
+## Feature brainstorm (Phase 5 backlog — implement top items, each with a smoke test)
+- [ ] Non-interactive profile mgmt: `--add <name> --type <t> [--agent a] [--args ...]`, `--rm` (have), `--edit`.
+- [ ] `--current --json` (machine-readable active profile).
+- [ ] Config schema versioning/migration (bump `version`, migrate old shapes safely).
+- [ ] Shell completion: `cldz --completion bash|zsh|fish` prints a completion script.
+- [ ] `cldz --version --all` also prints claude + codex versions.
+- [ ] `doctor` per-profile: for each profile, report whether its credential source resolves.
+- [ ] `cldz --rename <old> <new>` non-interactive.
+DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, whoami ✅, use ✅, codex token expiry ✅.
 
 ## ⚠️ NOTES FOR USER (when you return)
 - **npm token expired** (401 on whoami as of 2026-07-10). Everything is committed &
@@ -91,7 +95,7 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - 0.2.0 — multi-agent (claude+codex) + subscription profiles (pushed to git; NOT on npm — token expired)
 - 0.3.0 — --current/--whoami, --use, --list --json; Phase 2 verified (git only; npm paused)
 - 0.4.0 — first-run credential auto-import; Phase 3 subscription bridge BLOCKED/won't-fix (git only)
-- 0.5.0 — --print-env (eval mode) + per-profile default args (git only; npm paused)
+- 0.6.0 — --agent ad-hoc shortcut + codex token-expiry warning; Phase 4 complete (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

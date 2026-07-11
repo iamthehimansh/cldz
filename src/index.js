@@ -24,6 +24,7 @@ then just run ${b('cldz')}. Any extra arguments are passed straight to ${b('clau
 ${b('USAGE')}
   cldz [claude args...]           Launch Claude Code with your default profile
   cldz -P <name> [claude args]    Launch using a specific profile
+  cldz --agent codex [args]       Launch an agent ad-hoc on its ambient login (claude|codex)
   cldz -- <claude args>           Force everything through to claude (e.g. -- --help)
 
 ${b('MANAGEMENT')}
@@ -77,6 +78,18 @@ function doctor() {
     }
   }
 
+  // Codex token health (if a ~/.codex login exists).
+  const { codexTokenInfo } = require('./codextoken.js');
+  const tok = codexTokenInfo();
+  if (tok.present && tok.hasToken && tok.exp) {
+    if (tok.expired) {
+      process.stdout.write(warn('Codex access token is expired — re-login with `codex` if auth fails') + '\n');
+    } else {
+      const mins = Math.round(tok.secondsLeft / 60);
+      process.stdout.write(ok(`Codex access token valid (~${mins} min left)`) + '\n');
+    }
+  }
+
   const data = config.load();
   const names = config.profileNames(data);
   if (!names.length) {
@@ -97,8 +110,10 @@ function parse(argv) {
 
   const first = argv[0];
 
-  // Strip a `--profile` / `-P` selector wherever it appears before `--`.
+  // Strip `--profile`/`-P` and `--agent`/`-A` selectors wherever they appear
+  // before `--`.
   let profile = process.env.CLDZ_PROFILE || undefined;
+  let agent;
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -113,6 +128,14 @@ function parse(argv) {
     }
     if (a.startsWith('--profile=')) {
       profile = a.slice('--profile='.length);
+      continue;
+    }
+    if (a === '--agent' || a === '-A') {
+      agent = argv[++i];
+      continue;
+    }
+    if (a.startsWith('--agent=')) {
+      agent = a.slice('--agent='.length);
       continue;
     }
     rest.push(a);
@@ -154,7 +177,7 @@ function parse(argv) {
   let claudeArgs = rest;
   const dd = claudeArgs.indexOf('--');
   if (dd !== -1) claudeArgs = [...claudeArgs.slice(0, dd), ...claudeArgs.slice(dd + 1)];
-  return { command: 'run', profile, claudeArgs };
+  return { command: 'run', profile, agent, claudeArgs };
 }
 
 async function main(argv) {
@@ -197,7 +220,7 @@ async function main(argv) {
     }
     case 'run':
     default:
-      return run({ profile: parsed.profile, claudeArgs: parsed.claudeArgs || [] });
+      return run({ profile: parsed.profile, agent: parsed.agent, claudeArgs: parsed.claudeArgs || [] });
   }
 }
 

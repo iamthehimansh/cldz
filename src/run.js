@@ -5,7 +5,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { typeDef, buildEnv, agentOf } = require('./auth.js');
-const { agentDef } = require('./agents.js');
+const { agentDef, AGENTS } = require('./agents.js');
+const { codexTokenInfo } = require('./codextoken.js');
 const config = require('./config.js');
 const { configDir } = require('./paths.js');
 const wizard = require('./wizard.js');
@@ -284,14 +285,46 @@ const launchClaude = (args, env) => launchAgent('claude', args, env);
 const SKIP_PERMS_FLAG = '--dangerously-skip-permissions';
 
 // Entry point for the "run" path.
-async function run({ profile: requested, claudeArgs, quiet }) {
+async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet }) {
   const data = config.load();
-  const name = await determineProfile(data, requested);
-  const { resolved, sources } = await resolveProfile(data, name);
+
+  let name;
+  let stored;
+  let resolved;
+  let sources;
+  if (agentOverride) {
+    // Ad-hoc: `cldz --agent codex|claude ...` runs the agent on its ambient login
+    // (no profile, no isolation, nothing injected).
+    if (!AGENTS[agentOverride]) {
+      throw new Error(`unknown agent "${agentOverride}" — use "claude" or "codex"`);
+    }
+    stored = { type: agentOverride === 'codex' ? 'codexSubscription' : 'subscription' };
+    name = `${agentOverride} (ad-hoc)`;
+    resolved = { type: stored.type };
+    sources = {};
+  } else {
+    name = await determineProfile(data, requested);
+    stored = data.profiles[name];
+    ({ resolved, sources } = await resolveProfile(data, name));
+  }
+
   const extraEnv = buildEnv(resolved);
-  const stored = data.profiles[name];
   const agent = agentOf(stored);
-  const isolatedDir = applyIsolation(extraEnv, name, stored, data.shareHistory === true);
+  const isolatedDir = agentOverride
+    ? null
+    : applyIsolation(extraEnv, name, stored, data.shareHistory === true);
+
+  // Warn if a codex profile's stored access token has expired (codex will try to
+  // refresh it, but a stale token is a common cause of auth failures).
+  if (agent === 'codex') {
+    const info = codexTokenInfo();
+    if (info.present && info.hasToken && info.expired) {
+      process.stderr.write(
+        paint(c.yellow, 'cldz: your Codex access token looks expired — ') +
+          paint(c.dim, 'codex will try to refresh it; if auth fails, re-login with `codex`.\n')
+      );
+    }
+  }
 
   // Per-profile default args come first so user-supplied args can override them.
   const defaultArgs = Array.isArray(stored.args) ? stored.args : [];

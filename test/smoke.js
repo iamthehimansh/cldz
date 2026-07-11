@@ -225,6 +225,30 @@ check(
   r.stdout + r.stderr
 );
 
+// 22. --agent codex launches codex ad-hoc without any profile
+fs.rmSync(path.join(home, 'config.json'), { force: true });
+r = run(['--agent', 'codex', '--version'], { env: { CLDZ_CODEX_BIN: codexShim, HOME: importHome, USERPROFILE: importHome } });
+check('--agent codex launches codex ad-hoc (no profile needed)', /^CODEX /m.test(r.stdout), r.stdout + r.stderr);
+
+// 23. --agent claude launches claude ad-hoc on ambient login (no token injected)
+r = run(['--agent', 'claude'], { env: { CLDZ_CLAUDE_BIN: shim, HOME: importHome, USERPROFILE: importHome, ANTHROPIC_API_KEY: '' } });
+check('--agent claude launches claude ad-hoc (no token, no isolation)', /FAKE key= cfg= /.test(r.stdout), r.stdout + r.stderr);
+
+// 24. codex token expiry: a valid JWT is reported healthy, expired one warns (doctor)
+function fakeJwt(expSec) {
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64').replace(/=+$/, '');
+  return `${b64({ alg: 'none' })}.${b64({ exp: expSec })}.sig`;
+}
+const codexHome = path.join(home, 'codexhome');
+fs.mkdirSync(path.join(codexHome, '.codex'), { recursive: true });
+const nowSec = Math.floor(Date.now() / 1000);
+fs.writeFileSync(path.join(codexHome, '.codex', 'auth.json'), JSON.stringify({ tokens: { access_token: fakeJwt(nowSec + 3600) } }));
+r = run(['--doctor'], { env: { HOME: codexHome, USERPROFILE: codexHome } });
+check('doctor reports a valid codex token', /Codex access token valid/.test(r.stdout), r.stdout + r.stderr);
+fs.writeFileSync(path.join(codexHome, '.codex', 'auth.json'), JSON.stringify({ tokens: { access_token: fakeJwt(nowSec - 60) } }));
+r = run(['--doctor'], { env: { HOME: codexHome, USERPROFILE: codexHome } });
+check('doctor warns on an expired codex token', /Codex access token is expired/.test(r.stdout), r.stdout + r.stderr);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {
