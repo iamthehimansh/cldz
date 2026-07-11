@@ -217,15 +217,36 @@ function listProfiles({ json } = {}) {
 }
 
 // Show the active/default profile and current global settings.
-function showCurrent() {
+function showCurrent({ json } = {}) {
   const data = config.load();
   const name = data.defaultProfile || config.profileNames(data)[0];
   if (!name || !data.profiles[name]) {
+    if (json) {
+      process.stdout.write(JSON.stringify({ profile: null }, null, 2) + '\n');
+      return;
+    }
     process.stdout.write(paint(c.dim, 'No profile configured yet — run: cldz --config\n'));
     return;
   }
   const p = data.profiles[name];
   const def = typeDef(p.type);
+  if (json) {
+    process.stdout.write(
+      JSON.stringify(
+        {
+          profile: name,
+          agent: agentOf(p),
+          type: p.type,
+          isolated: isIsolated(p),
+          shareHistory: data.shareHistory === true,
+          skipPermissions: data.skipPermissions === true,
+        },
+        null,
+        2
+      ) + '\n'
+    );
+    return;
+  }
   process.stdout.write(
     paint(c.bold, name) +
       '  ' + paint(c.cyan, `[${agentDef(agentOf(p)).label}]`) +

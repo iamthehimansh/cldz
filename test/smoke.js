@@ -278,6 +278,37 @@ check(
   r.stdout + r.stderr
 );
 
+// 28. --edit updates fields, --set, --unset, --args
+writeConfig({ version: 1, defaultProfile: 'm', profiles: { m: { type: 'apiKey', apiKey: 'old', args: ['--x'] } } });
+run(['--edit', 'm', '--set', 'apiKey=new', '--unset', 'args', '--type', 'oauth', '--set', 'oauthToken=tok']);
+const edited = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8')).profiles.m;
+check(
+  '--edit applies --type/--set/--unset',
+  edited.type === 'oauth' && edited.apiKey === 'new' && edited.oauthToken === 'tok' && edited.args === undefined,
+  JSON.stringify(edited)
+);
+r = run(['--edit', 'nope', '--set', 'x=1']);
+check('--edit rejects an unknown profile', r.status !== 0 && /not found/.test(r.stderr), r.stdout + r.stderr);
+
+// 29. --current --json emits machine-readable active profile
+writeConfig({ version: 1, defaultProfile: 'cx', shareHistory: true, profiles: { cx: { type: 'codexSubscription' } } });
+r = run(['--current', '--json']);
+let curJson = null;
+try { curJson = JSON.parse(r.stdout); } catch { /* null */ }
+check(
+  '--current --json emits the active profile as JSON',
+  curJson && curJson.profile === 'cx' && curJson.agent === 'codex' && curJson.shareHistory === true,
+  r.stdout + r.stderr
+);
+
+// 30. --version --all prints cldz + agent versions
+r = run(['--version', '--all'], { env: { CLDZ_CLAUDE_BIN: shim, CLDZ_CODEX_BIN: codexShim } });
+check(
+  '--version --all prints cldz and both agents',
+  /cldz \d+\.\d+\.\d+/.test(r.stdout) && /Claude Code:/.test(r.stdout) && /Codex:/.test(r.stdout),
+  r.stdout + r.stderr
+);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

@@ -9,8 +9,20 @@ const { paint, colors: c } = tty;
 
 const pkg = require('../package.json');
 
-function printVersion() {
+function printVersion(all) {
   process.stdout.write(`cldz ${pkg.version}\n`);
+  if (!all) return;
+  const { AGENTS } = require('./agents.js');
+  for (const def of Object.values(AGENTS)) {
+    const bin = process.env[def.binEnv] || def.bin;
+    let ver = 'not found';
+    try {
+      ver = execFileSync(bin, ['--version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch {
+      /* not installed */
+    }
+    process.stdout.write(`${def.label}: ${ver}\n`);
+  }
 }
 
 function printHelp() {
@@ -34,6 +46,7 @@ ${b('MANAGEMENT')}
   cldz --use <name>               Set the default profile (alias --set-default)
   cldz --add <name> --type <t>    Create a profile non-interactively
                                     [--set k=v] [--args "…"] [--default]
+  cldz --edit <name> [...]        Update a profile [--type][--set k=v][--unset k][--args][--default]
   cldz --rename <old> <new>       Rename a profile
   cldz --remove <name>            Delete a profile
   cldz --env [name]               Print the env vars a profile sets (secrets masked)
@@ -123,6 +136,26 @@ function parseAdd(argv) {
   return opts;
 }
 
+// `cldz --edit <name> [--type t] [--set k=v] [--unset k] [--args "…"] [--default]`
+function parseEdit(argv) {
+  const opts = { command: 'edit', name: undefined, type: undefined, sets: {}, unsets: [], argsStr: undefined, makeDefault: false };
+  for (let i = 1; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--type') opts.type = argv[++i];
+    else if (a.startsWith('--type=')) opts.type = a.slice('--type='.length);
+    else if (a === '--args') opts.argsStr = argv[++i];
+    else if (a.startsWith('--args=')) opts.argsStr = a.slice('--args='.length);
+    else if (a === '--set') {
+      const kv = argv[++i] || '';
+      const eq = kv.indexOf('=');
+      if (eq > 0) opts.sets[kv.slice(0, eq)] = kv.slice(eq + 1);
+    } else if (a === '--unset') opts.unsets.push(argv[++i]);
+    else if (a === '--default') opts.makeDefault = true;
+    else if (!a.startsWith('-') && opts.name === undefined) opts.name = a;
+  }
+  return opts;
+}
+
 // Parse argv into { command, profile, claudeArgs, rest }.
 function parse(argv) {
   // Explicit force-passthrough: `cldz -- <claude args>`
@@ -134,6 +167,7 @@ function parse(argv) {
 
   // Non-interactive profile management (parsed specially).
   if (first === '--add') return parseAdd(argv);
+  if (first === '--edit') return parseEdit(argv);
   if (first === '--rename') return { command: 'rename', name: argv[1], name2: argv[2] };
 
   // Strip `--profile`/`-P` and `--agent`/`-A` selectors wherever they appear
@@ -185,7 +219,7 @@ function parse(argv) {
       return { command: 'set-default', name: argv[1] };
     case '--current':
     case '--whoami':
-      return { command: 'current' };
+      return { command: 'current', json: rest.includes('--json') };
     case '--remove':
     case '--delete':
       return { command: 'remove', name: argv[1] };
@@ -194,7 +228,7 @@ function parse(argv) {
       return { command: 'help' };
     case '--version':
     case '-V':
-      return { command: 'version' };
+      return { command: 'version', all: rest.includes('--all') };
     default:
       break;
   }
@@ -213,7 +247,7 @@ async function main(argv) {
     case 'help':
       return printHelp();
     case 'version':
-      return printVersion();
+      return printVersion(parsed.all);
     case 'doctor':
       return doctor();
     case 'config':
@@ -221,7 +255,7 @@ async function main(argv) {
     case 'list':
       return manager.listProfiles({ json: parsed.json });
     case 'current':
-      return manager.showCurrent();
+      return manager.showCurrent({ json: parsed.json });
     case 'env':
       return manager.showEnv(parsed.profile);
     case 'print-env':
@@ -254,6 +288,27 @@ async function main(argv) {
         paint(c.green, `✓ Added "${parsed.name}"`) +
           paint(c.dim, ` [${agentDef(agentOf(profile)).label}] ${AUTH_TYPES[parsed.type].label}`) + '\n'
       );
+      return;
+    }
+    case 'edit': {
+      const { AUTH_TYPES } = require('./auth.js');
+      if (!parsed.name) throw new Error('usage: cldz --edit <name> [--type t] [--set k=v] [--unset k] [--args "…"] [--default]');
+      const data = config.load();
+      const p = data.profiles[parsed.name];
+      if (!p) throw new Error(`profile "${parsed.name}" not found`);
+      if (parsed.type) {
+        if (!AUTH_TYPES[parsed.type]) throw new Error(`--type must be one of: ${Object.keys(AUTH_TYPES).join(', ')}`);
+        p.type = parsed.type;
+      }
+      for (const [k, v] of Object.entries(parsed.sets)) p[k] = v;
+      for (const f of parsed.unsets) delete p[f];
+      if (parsed.argsStr !== undefined) {
+        if (parsed.argsStr.trim()) p.args = parsed.argsStr.trim().split(/\s+/);
+        else delete p.args;
+      }
+      if (parsed.makeDefault) config.setDefault(data, parsed.name);
+      config.save(data);
+      process.stdout.write(paint(c.green, `✓ Updated "${parsed.name}".\n`));
       return;
     }
     case 'rename': {
