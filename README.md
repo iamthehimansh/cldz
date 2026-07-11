@@ -218,6 +218,8 @@ junctions (no admin needed).
 
 ## Unified API profiles (run any agent on any provider)
 
+> Full cross-agent guide: [docs/cross-agent.md](docs/cross-agent.md).
+
 The `api` profile type lets you store **one API key + provider + default agent**
 and run it directly — cldz handles the proxy for you when the agent and provider
 don't match natively.
