@@ -1,6 +1,6 @@
 'use strict';
 
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -459,6 +459,58 @@ function seedCodexAuth(name, dir, authSrc) {
   );
 }
 
+// Interactive "sign in now?" offered from `cldz --config` after creating/editing
+// an isolated codex profile. Tokens go into codex's auth file, never cldz config.
+async function offerCodexSignIn(name, stored) {
+  if (agentOf(stored) !== 'codex' || !isIsolated(stored)) return;
+  let method;
+  try {
+    method = await tty.select(`Sign in to Codex for "${name}" now?`, [
+      { name: 'Sign in with codex (opens codex login)', value: 'oauth' },
+      { name: 'Paste an access token', value: 'token' },
+      { name: 'Paste the full auth.json (one line)', value: 'authjson' },
+      { name: `Later — run: cldz --login -P ${name}`, value: 'skip' },
+    ]);
+  } catch (e) {
+    if (e && e.code === 'CLDZ_ABORT') return;
+    throw e;
+  }
+  if (method === 'skip') return;
+
+  const dir = sessionDir(name, stored);
+  fs.mkdirSync(dir, { recursive: true });
+  const bin = process.env.CLDZ_CODEX_BIN || 'codex';
+  const env = { ...process.env, CODEX_HOME: dir };
+  const shell = process.platform === 'win32';
+
+  if (method === 'authjson') {
+    const raw = await tty.ask('  auth.json');
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed.tokens || !parsed.tokens.access_token) throw new Error('missing tokens.access_token');
+      fs.writeFileSync(path.join(dir, 'auth.json'), JSON.stringify(parsed, null, 2) + '\n', { mode: 0o600 });
+      process.stdout.write(paint(c.green, `  ✓ Seeded codex auth for "${name}".\n`));
+    } catch (e) {
+      process.stdout.write(paint(c.red, `  Not valid auth.json: ${e.message}\n`));
+    }
+    return;
+  }
+
+  let token;
+  if (method === 'token') token = await tty.askSecret('  Access token');
+  tty.close(); // release stdin for the codex child
+  let res;
+  if (method === 'oauth') {
+    res = spawnSync(bin, ['login'], { stdio: 'inherit', env, shell });
+  } else {
+    if (!token) return;
+    res = spawnSync(bin, ['login', '--with-access-token'], { input: token + '\n', stdio: ['pipe', 'inherit', 'inherit'], env, shell });
+  }
+  if (res && res.error) {
+    process.stdout.write(paint(c.red, `  codex login failed: ${res.error.message}\n`));
+  }
+}
+
 async function login({ profile: requested, mode, authSrc }) {
   const data = config.load();
   const name = await determineProfile(data, requested);
@@ -600,6 +652,7 @@ async function run({ profile: requested, agent: agentOverride, claudeArgs, quiet
 module.exports = {
   run,
   login,
+  offerCodexSignIn,
   resolveProfile,
   determineProfile,
   launchClaude,

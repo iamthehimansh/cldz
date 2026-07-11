@@ -154,6 +154,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.14.1 — codex shared history now also links session_index.jsonl so cross-profile chats show in the codex resume picker (git only; npm paused)
 - 0.15.0 — cldz --login (native per-profile sign-in, no token storage); config message no longer hardcodes Claude Code (git only; npm paused)
 - 0.16.0 — cldz --login token modes for codex: --with-access-token / --with-api-key (official) + --auth-json seed (isolated only); cldz never stores tokens (git only; npm paused)
+- 0.17.0 — cldz --config offers codex sign-in on add/edit of an isolated profile (codex login / access token / auth.json); tokens go to codex auth file, not cldz config (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

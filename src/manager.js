@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const config = require('./config.js');
 const { typeDef, buildEnv, agentOf } = require('./auth.js');
 const { agentDef } = require('./agents.js');
-const { sessionDir, linkSharedHistory, isIsolated } = require('./run.js');
+const { sessionDir, linkSharedHistory, isIsolated, offerCodexSignIn } = require('./run.js');
 const wizard = require('./wizard.js');
 const tty = require('./tty.js');
 const { paint, colors: c } = tty;
@@ -104,12 +104,14 @@ async function manage() {
         const name = await wizard.configureProfile(data, {});
         config.save(data);
         process.stdout.write(paint(c.green, `✓ Added "${name}".\n\n`));
+        await offerCodexSignIn(name, data.profiles[name]);
       } else if (action === 'edit') {
         const name = await chooseProfile(data, 'Edit which profile?');
         if (name) {
           await wizard.configureProfile(data, { name });
           config.save(data);
           process.stdout.write(paint(c.green, `✓ Updated "${name}".\n\n`));
+          await offerCodexSignIn(name, data.profiles[name]);
         }
       } else if (action === 'delete') {
         const name = await chooseProfile(data, 'Delete which profile?');

@@ -141,7 +141,11 @@ existing `~/.claude` / `~/.codex` login. (Token/API-key profiles are always
 isolated.) An isolated subscription profile shows the agent's normal login screen
 on first launch so you can sign into that account.
 
-To sign in explicitly (e.g. before your first real run), use:
+When you create an isolated Codex profile in **`cldz --config`**, it offers to
+sign in right there — `codex login`, paste an access token, or paste the full
+`auth.json` — so you can set the account up in one flow.
+
+To sign in explicitly later (or for scripting), use:
 
 ```bash
 cldz --login -P work-codex     # runs the agent's native login in that profile's dir

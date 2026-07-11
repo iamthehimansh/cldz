@@ -562,6 +562,31 @@ check('--auth-json refuses a shared profile (protects ~/.codex)', r.status !== 0
 const cfgTxt = fs.readFileSync(path.join(home, 'config.json'), 'utf8');
 check('cldz config never stores the pasted tokens', !cfgTxt.includes('RT') && !cfgTxt.includes('access_token'), cfgTxt);
 
+// 52. `cldz --config` offers codex sign-in; pasted auth.json lands in the profile
+//     dir (not cldz config). Drives: Add(1) → codexSubscription(8) → separate(y) →
+//     args(blank) → name → sign-in menu → auth.json(3) → JSON → Save&exit(8).
+{
+  const cfgHome = path.join(home, 'cfgsignin');
+  fs.mkdirSync(cfgHome, { recursive: true });
+  const authLine = '{"auth_mode":"chatgpt","tokens":{"access_token":"AAA","refresh_token":"RRR","account_id":"ID"}}';
+  const input = ['1', '8', 'y', '', 'cxacct', '3', authLine, '8', ''].join('\n');
+  const rr = spawnSync(process.execPath, [CLI, '--config'], {
+    encoding: 'utf8',
+    env: { ...baseEnv, CLDZ_HOME: cfgHome, CLDZ_CODEX_BIN: '/bin/true' },
+    input,
+    timeout: 10000,
+  });
+  const seededFile = path.join(cfgHome, 'sessions', 'cxacct', 'auth.json');
+  const cfg = fs.existsSync(path.join(cfgHome, 'config.json')) ? fs.readFileSync(path.join(cfgHome, 'config.json'), 'utf8') : '';
+  check(
+    '--config codex sign-in seeds auth.json in the profile dir (not cldz config)',
+    fs.existsSync(seededFile) &&
+      JSON.parse(fs.readFileSync(seededFile, 'utf8')).tokens.refresh_token === 'RRR' &&
+      !cfg.includes('RRR'),
+    (rr.stdout || '') + (rr.stderr || ''),
+  );
+}
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {
