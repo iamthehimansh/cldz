@@ -80,8 +80,11 @@ do the next unchecked item, test (`node test/smoke.js`), commit, update this fil
 - [x] `--version --all` (also prints claude + codex versions) (v0.8.0)
 - [x] `doctor` per-profile credential-resolves check (v0.9.0)
 - [x] `cldz --dry-run` prints the launch plan (agent, command, config dir, masked env) without launching (v0.9.0)
-- [ ] Config schema versioning/migration (bump `version`, migrate old shapes safely).
-- [ ] Shell completion: `cldz --completion bash|zsh|fish` prints a completion script.
+- [x] Config schema versioning/migration — lossless migrate() + forward-compat (v0.10.0)
+- [x] Shell completion: `cldz --completion bash|zsh|fish` (+ hidden --profile-names) (v0.10.0)
+
+**Phase 5 COMPLETE.** Next: brainstormed new features (each with a smoke test) —
+--export/--import config, per-profile description/notes, CLDZ_NO_ISOLATION env, --open-config.
 - [ ] `cldz --version --all` also prints claude + codex versions.
 - [ ] `doctor` per-profile: for each profile, report whether its credential source resolves.
 - [ ] `cldz --rename <old> <new>` non-interactive.
@@ -104,6 +107,7 @@ DONE from earlier backlog: import creds ✅, ls --json ✅, default args ✅, wh
 - 0.7.0 — non-interactive --add / --rename profile mgmt (git only; npm paused)
 - 0.8.0 — --edit + --current --json + --version --all (git only; npm paused)
 - 0.9.0 — doctor per-profile credential check + --dry-run (git only; npm paused)
+- 0.10.0 — config migration framework + shell completion; Phase 5 complete (git only; npm paused)
 
 ## Autonomous-iteration note
 - Do NOT retry `npm publish` — token is dead until the user rotates it. Keep

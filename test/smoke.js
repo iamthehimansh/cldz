@@ -328,6 +328,50 @@ check(
   r.stdout + r.stderr
 );
 
+// 33. config migration: a legacy config (no version + unknown key) upgrades
+//     losslessly and stamps the current version on the next save
+fs.writeFileSync(
+  path.join(home, 'config.json'),
+  JSON.stringify({ profiles: { work: { type: 'apiKey', apiKey: 'k' } }, weirdLegacyKey: 123 })
+);
+run(['--add', 'extra', '--type', 'subscription']); // triggers load -> migrate -> save
+const migrated = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf8'));
+check(
+  'legacy config migrates losslessly and stamps version >= 2',
+  migrated.version >= 2 &&
+    migrated.profiles.work && migrated.profiles.work.apiKey === 'k' &&
+    migrated.profiles.extra &&
+    migrated.weirdLegacyKey === 123,
+  JSON.stringify(migrated)
+);
+
+// 34. forward-compat: a newer-version config is not downgraded or corrupted
+fs.writeFileSync(
+  path.join(home, 'config.json'),
+  JSON.stringify({ version: 999, defaultProfile: 'a', profiles: { a: { type: 'subscription' } } })
+);
+r = run(['--list', '--json']);
+let fwd = null;
+try { fwd = JSON.parse(r.stdout); } catch { /* null */ }
+check(
+  'a future-version config still loads without corruption',
+  r.status === 0 && fwd && fwd.profiles.length === 1 && fwd.defaultProfile === 'a',
+  r.stdout + r.stderr
+);
+
+// 35. shell completion scripts print for each shell; bad shell errors
+for (const sh of ['bash', 'zsh', 'fish']) {
+  r = run(['--completion', sh]);
+  check(`--completion ${sh} prints a completion script`, r.status === 0 && /cldz/.test(r.stdout) && r.stdout.length > 50, r.stdout + r.stderr);
+}
+r = run(['--completion', 'nope']);
+check('--completion rejects an unknown shell', r.status !== 0 && /bash\|zsh\|fish/.test(r.stderr), r.stdout + r.stderr);
+
+// 36. --profile-names lists profile names (used by completion)
+writeConfig({ version: 2, defaultProfile: 'a', profiles: { a: { type: 'subscription' }, b: { type: 'subscription' } } });
+r = run(['--profile-names']);
+check('--profile-names lists names one per line', r.stdout.trim().split('\n').sort().join(',') === 'a,b', r.stdout + r.stderr);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

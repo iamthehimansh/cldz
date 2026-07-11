@@ -3,7 +3,31 @@
 const fs = require('node:fs');
 const { configDir, configPath } = require('./paths.js');
 
-const CONFIG_VERSION = 1;
+const CONFIG_VERSION = 2;
+
+// Stepwise migrations keyed by the version they upgrade FROM. Each returns the
+// migrated object with `version` bumped. Keep them additive and lossless.
+const MIGRATIONS = {
+  // 1 -> 2: no structural change (subscription/agent/args fields are all
+  // additive and back-compatible). Just stamp the new version.
+  1: (d) => {
+    d.version = 2;
+    return d;
+  },
+};
+
+// Bring a parsed config up to CONFIG_VERSION without losing unknown keys. A
+// config from a newer cldz (version > ours) is left untouched (forward-compat).
+function migrate(data) {
+  if (typeof data.version === 'number' && data.version > CONFIG_VERSION) return data;
+  let v = typeof data.version === 'number' ? data.version : 1;
+  while (v < CONFIG_VERSION && MIGRATIONS[v]) {
+    data = MIGRATIONS[v](data);
+    v = typeof data.version === 'number' ? data.version : v + 1;
+  }
+  data.version = v < CONFIG_VERSION ? CONFIG_VERSION : data.version;
+  return data;
+}
 
 function emptyConfig() {
   return { version: CONFIG_VERSION, defaultProfile: null, profiles: {} };
@@ -26,8 +50,9 @@ function load() {
   }
   if (!data || typeof data !== 'object') return emptyConfig();
   if (!data.profiles || typeof data.profiles !== 'object') data.profiles = {};
-  if (typeof data.version !== 'number') data.version = CONFIG_VERSION;
   if (!('defaultProfile' in data)) data.defaultProfile = null;
+  // Normalize/upgrade the schema (preserves unknown keys — no data loss).
+  data = migrate(data);
   return data;
 }
 
@@ -69,6 +94,7 @@ function removeProfile(data, name) {
 
 module.exports = {
   CONFIG_VERSION,
+  migrate,
   emptyConfig,
   load,
   save,

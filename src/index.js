@@ -53,8 +53,9 @@ ${b('MANAGEMENT')}
   cldz --env [name]               Print the env vars a profile sets (secrets masked)
   cldz --print-env [name]         Raw exports for eval "$(cldz --print-env)" (unmasked)
   cldz --doctor                   Check your setup
+  cldz --completion bash|zsh|fish Print a shell-completion script
   cldz --help                     Show this help
-  cldz --version                  Show version
+  cldz --version [--all]          Show version (--all: also claude + codex)
 
 ${b('ISOLATION')}
   By default each profile runs claude with its own CLAUDE_CONFIG_DIR
@@ -228,6 +229,10 @@ function parse(argv) {
       return { command: 'print-env', profile: argv[1] };
     case '--doctor':
       return { command: 'doctor' };
+    case '--completion':
+      return { command: 'completion', shell: argv[1] };
+    case '--profile-names':
+      return { command: 'profile-names' };
     case '--set-default':
     case '--use':
       return { command: 'set-default', name: argv[1] };
@@ -264,6 +269,13 @@ async function main(argv) {
       return printVersion(parsed.all);
     case 'doctor':
       return doctor();
+    case 'completion':
+      return process.stdout.write(require('./completion.js').printScript(parsed.shell));
+    case 'profile-names': {
+      const data = config.load();
+      process.stdout.write(config.profileNames(data).join('\n') + '\n');
+      return;
+    }
     case 'config':
       return manager.manage();
     case 'list':

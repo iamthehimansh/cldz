@@ -95,7 +95,9 @@ cldz --print-env work         # raw exports for: eval "$(cldz --print-env work)"
 cldz --current                # show the active profile + settings (alias --whoami)
 cldz --use work               # set the default profile
 cldz --list --json            # machine-readable profile list
-cldz --doctor                 # check your setup
+cldz --doctor                 # check your setup (per-profile credential status)
+cldz --dry-run -P work        # print what would launch, without launching
+cldz --completion zsh         # shell completion: eval "$(cldz --completion zsh)"
 ```
 
 Each profile can also carry **default args** always passed to the agent (set in
