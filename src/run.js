@@ -427,30 +427,72 @@ function launchApiProfile({ name, stored, agent, claudeArgs, data, quiet, dryRun
   else launchViaSwitchyard(agent, provider, key, stored.model, finalArgs, extraEnv);
 }
 
-// `cldz --login -P <name>`: run the agent's native login in the profile's own
-// dir, so an isolated profile can sign into its (separate) account. No tokens are
-// stored by cldz — the agent does its own OAuth into its config dir.
-async function login({ profile: requested }) {
+// `cldz --login -P <name>`: sign a profile into its account. Modes:
+//   (default)            interactive OAuth (`codex login` / claude login screen)
+//   --with-access-token  pipe a token to codex's official `codex login --with-access-token`
+//   --with-api-key       pipe a key to codex's official `codex login --with-api-key`
+//   --auth-json [file]   seed the profile's own auth.json (codex re-mints from its refresh_token)
+// cldz never stores tokens in its config — they live in the agent's auth file.
+function seedCodexAuth(name, dir, authSrc) {
+  if (!dir) {
+    throw new Error(
+      `seeding auth.json needs an ISOLATED profile so it won't overwrite your main ~/.codex — run: cldz --edit ${name} --set isolate=true`
+    );
+  }
+  let raw;
+  if (authSrc && authSrc !== true) raw = fs.readFileSync(authSrc, 'utf8');
+  else raw = fs.readFileSync(0, 'utf8'); // stdin (paste the auth.json)
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('input is not a valid codex auth.json (expected JSON)');
+  }
+  if (!parsed || !parsed.tokens || !parsed.tokens.access_token) {
+    throw new Error('auth.json is missing tokens.access_token');
+  }
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'auth.json'), JSON.stringify(parsed, null, 2) + '\n', { mode: 0o600 });
+  process.stdout.write(
+    paint(c.green, `✓ Seeded codex auth for profile "${name}"`) +
+      paint(c.dim, ` in ${dir} — codex will refresh it from its refresh_token.\n`)
+  );
+}
+
+async function login({ profile: requested, mode, authSrc }) {
   const data = config.load();
   const name = await determineProfile(data, requested);
   const stored = data.profiles[name];
   const agent = agentOf(stored);
   const agDef = agentDef(agent);
+  const dir = isIsolated(stored) ? sessionDir(name, stored) : null;
+
+  if (mode === 'auth-json') {
+    if (agent !== 'codex') throw new Error('--auth-json applies to codex profiles');
+    return seedCodexAuth(name, dir, authSrc);
+  }
+  if ((mode === 'access-token' || mode === 'api-key') && agent !== 'codex') {
+    throw new Error('--with-access-token / --with-api-key are codex-only; for claude use an oauth-token profile');
+  }
 
   const extraEnv = {};
-  let dir = null;
-  if (isIsolated(stored)) {
-    dir = sessionDir(name, stored);
+  if (dir) {
     fs.mkdirSync(dir, { recursive: true });
     extraEnv[agDef.configDirEnv] = dir;
   }
+  const label = mode ? `${mode} ` : '';
   process.stderr.write(
-    paint(c.dim, `cldz › signing in to ${agDef.label} for profile "${name}" ${dir ? 'in ' + dir : '(shared login)'}\n`)
+    paint(c.dim, `cldz › ${label}login to ${agDef.label} for profile "${name}" ${dir ? 'in ' + dir : '(shared login)'}\n`)
   );
   tty.close();
   const bin = process.env[agDef.binEnv] || agDef.bin;
-  // codex has a dedicated `login`; claude signs in when launched in a fresh dir.
-  const args = agent === 'codex' ? ['login'] : [];
+  let args = [];
+  if (agent === 'codex') {
+    if (mode === 'access-token') args = ['login', '--with-access-token'];
+    else if (mode === 'api-key') args = ['login', '--with-api-key'];
+    else args = ['login'];
+  }
+  // stdio inherited: codex reads the piped/pasted token from stdin — cldz never sees it.
   const child = spawn(bin, args, { stdio: 'inherit', env: { ...process.env, ...extraEnv }, shell: process.platform === 'win32' });
   child.on('error', (err) => {
     if (err.code === 'ENOENT') {

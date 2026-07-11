@@ -540,6 +540,28 @@ check(
   r.stdout + r.stderr
 );
 
+// 49. --login --with-access-token uses codex's official token-login flag
+r = run(['--login', '-P', 'wc', '--with-access-token'], { env: { CLDZ_CODEX_BIN: codexShim } });
+check('--login --with-access-token invokes codex official flag', /args=login\|--with-access-token/.test(r.stdout), r.stdout + r.stderr);
+
+// 50. --login --auth-json seeds the isolated profile's own codex auth.json
+r = run(['--login', '-P', 'wc', '--auth-json'], { input: '{"tokens":{"access_token":"AT","refresh_token":"RT","account_id":"ID"}}' });
+const seeded = path.join(home, 'sessions', 'wc', 'auth.json');
+check(
+  '--login --auth-json seeds codex auth.json (with refresh_token)',
+  fs.existsSync(seeded) && JSON.parse(fs.readFileSync(seeded, 'utf8')).tokens.refresh_token === 'RT',
+  r.stdout + r.stderr
+);
+
+// 51. --auth-json refuses a shared (non-isolated) profile so ~/.codex is safe
+writeConfig({ version: 2, defaultProfile: 'sh', profiles: { sh: { type: 'codexSubscription' } } });
+r = run(['--login', '-P', 'sh', '--auth-json'], { input: '{"tokens":{"access_token":"x"}}' });
+check('--auth-json refuses a shared profile (protects ~/.codex)', r.status !== 0 && /ISOLATED profile/.test(r.stderr), r.stdout + r.stderr);
+
+// cldz must NOT store the pasted tokens in its own config
+const cfgTxt = fs.readFileSync(path.join(home, 'config.json'), 'utf8');
+check('cldz config never stores the pasted tokens', !cfgTxt.includes('RT') && !cfgTxt.includes('access_token'), cfgTxt);
+
 try {
   fs.rmSync(home, { recursive: true, force: true });
 } catch {

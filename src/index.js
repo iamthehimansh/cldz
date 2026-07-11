@@ -38,6 +38,8 @@ ${b('USAGE')}
   cldz -P <name> [claude args]    Launch using a specific profile
   cldz --agent codex [args]       Launch an agent ad-hoc on its ambient login (claude|codex)
   cldz --login -P <name>          Sign in to a profile's account (native login in its own dir)
+                                    codex: [--with-access-token | --with-api-key] (piped via stdin),
+                                    or --auth-json [file] to seed the profile's codex auth.json
   cldz --dry-run [-P name]        Print what would launch (agent, command, env) without running
   cldz -- <claude args>           Force everything through to claude (e.g. -- --help)
 
@@ -273,8 +275,18 @@ function parse(argv) {
     case '--set-default':
     case '--use':
       return { command: 'set-default', name: argv[1] };
-    case '--login':
-      return { command: 'login', profile };
+    case '--login': {
+      let mode;
+      let authSrc;
+      if (argv.includes('--with-access-token')) mode = 'access-token';
+      else if (argv.includes('--with-api-key')) mode = 'api-key';
+      else if (argv.includes('--auth-json')) {
+        mode = 'auth-json';
+        const nx = argv[argv.indexOf('--auth-json') + 1];
+        authSrc = nx && !nx.startsWith('-') ? nx : true;
+      }
+      return { command: 'login', profile, mode, authSrc };
+    }
     case '--current':
     case '--whoami':
       return { command: 'current', json: rest.includes('--json') };
@@ -326,7 +338,7 @@ async function main(argv) {
     case 'list':
       return manager.listProfiles({ json: parsed.json });
     case 'login':
-      return login({ profile: parsed.profile });
+      return login({ profile: parsed.profile, mode: parsed.mode, authSrc: parsed.authSrc });
     case 'current':
       return manager.showCurrent({ json: parsed.json });
     case 'env':

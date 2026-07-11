@@ -148,11 +148,23 @@ cldz --login -P work-codex     # runs the agent's native login in that profile's
                                # (codex → `codex login`; claude → its login screen)
 ```
 
-`cldz` never stores your session tokens — each account signs in through the
-agent's own OAuth into that profile's config dir. If you'd rather seed a profile
-from credentials you already have, its dir is `~/.cldz/sessions/<profile>/`
-(`cldz --dry-run -P <profile>` prints it) — you can place the agent's own
-`auth.json` there yourself; cldz won't prompt for or hold those tokens.
+For **Codex**, `--login` also exposes Codex's official headless-auth options
+(handy for a separate/second account or a headless machine):
+
+```bash
+printenv CODEX_ACCESS_TOKEN | cldz --login -P work-codex --with-access-token
+printenv OPENAI_API_KEY     | cldz --login -P work-codex --with-api-key
+cat account.auth.json       | cldz --login -P work-codex --auth-json   # or: --auth-json <file>
+```
+
+- `--with-access-token` / `--with-api-key` pipe straight into Codex's own
+  `codex login` — **cldz never sees the token** (it's read by codex from stdin).
+- `--auth-json` seeds the profile's own `~/.cldz/sessions/<name>/auth.json` (Codex's
+  credential file, incl. the `refresh_token` so Codex re-mints access tokens itself).
+  It **requires an isolated profile** so it can't overwrite your main `~/.codex`.
+
+In all cases the tokens live in **Codex's** auth file inside the profile's dir —
+**cldz never stores them in its own config**. Codex owns and refreshes them.
 
 ## Session isolation
 
