@@ -37,6 +37,7 @@ ${b('USAGE')}
   cldz [claude args...]           Launch Claude Code with your default profile
   cldz -P <name> [claude args]    Launch using a specific profile
   cldz --agent codex [args]       Launch an agent ad-hoc on its ambient login (claude|codex)
+  cldz --reset -P <name> [--force] Wipe a profile's isolated session dir (clears a stale cached login)
   cldz --login -P <name>          Sign in to a profile's account (native login in its own dir)
                                     codex: [--with-access-token | --with-api-key] (piped via stdin),
                                     or --auth-json [file] to seed the profile's codex auth.json
@@ -268,6 +269,8 @@ function parse(argv) {
       return { command: 'profile-names' };
     case '--path':
       return { command: 'path' };
+    case '--reset':
+      return { command: 'reset', profile, force: argv.includes('--force') };
     case '--export':
       return { command: 'export', file: argv.slice(1).find((a) => !a.startsWith('-')), withSecrets: argv.includes('--with-secrets') };
     case '--import':
@@ -329,6 +332,8 @@ async function main(argv) {
     }
     case 'path':
       return process.stdout.write(config.configPath() + '\n');
+    case 'reset':
+      return manager.resetProfile({ profile: parsed.profile, force: parsed.force });
     case 'export':
       return manager.exportConfig({ file: parsed.file, withSecrets: parsed.withSecrets });
     case 'import':

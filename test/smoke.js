@@ -589,6 +589,17 @@ check('cldz config never stores the pasted tokens', !cfgTxt.includes('RT') && !c
   );
 }
 
+// 52b. --reset wipes an isolated profile's session dir (clears a stale cached
+//      credential that would otherwise override the injected token)
+writeConfig({ version: 2, defaultProfile: 'd', profiles: { d: { type: 'oauth', oauthToken: 'x', isolate: true } } });
+fs.mkdirSync(path.join(home, 'sessions', 'd'), { recursive: true });
+fs.writeFileSync(path.join(home, 'sessions', 'd', '.credentials.json'), '{"stale":1}');
+r = run(['--reset', '-P', 'd', '--force']);
+check('--reset wipes an isolated profile session dir', !fs.existsSync(path.join(home, 'sessions', 'd')) && /Reset/.test(r.stdout), r.stdout + r.stderr);
+writeConfig({ version: 2, defaultProfile: 's', profiles: { s: { type: 'subscription' } } });
+r = run(['--reset', '-P', 's', '--force']);
+check('--reset on a shared profile is a safe no-op', /nothing to reset/.test(r.stdout) && r.status === 0, r.stdout + r.stderr);
+
 // 53. a multi-line paste into `--config` must NOT cascade into profile creation:
 //     select() bails after a burst of invalid input instead of defaulting.
 {

@@ -387,4 +387,35 @@ function importConfig({ file, force } = {}) {
   );
 }
 
-module.exports = { manage, listProfiles, showCurrent, showEnv, printEnvRaw, exportConfig, importConfig, chooseProfile };
+// `cldz --reset -P <name>`: wipe a profile's isolated session dir so the next
+// launch re-initialises (clears a stale cached credential that was overriding the
+// injected token — a common cause of "works on one machine, 401s on another").
+async function resetProfile({ profile, force } = {}) {
+  const data = config.load();
+  const name = profile || data.defaultProfile;
+  if (!name || !data.profiles[name]) throw new Error(`profile "${name || ''}" not found`);
+  const p = data.profiles[name];
+  if (!isIsolated(p)) {
+    process.stdout.write(paint(c.dim, `"${name}" shares the ambient login (not isolated) — nothing to reset.\n`));
+    return;
+  }
+  const dir = sessionDir(name, p);
+  if (!fs.existsSync(dir)) {
+    process.stdout.write(paint(c.dim, `No session dir for "${name}" yet — nothing to reset.\n`));
+    return;
+  }
+  if (!force) {
+    const ok = await tty.confirm(`Delete "${name}" session dir (${dir})? Next launch re-inits (fresh login / re-uses the injected token).`, {
+      defaultValue: false,
+    });
+    tty.close();
+    if (!ok) {
+      process.stdout.write(paint(c.dim, '(cancelled)\n'));
+      return;
+    }
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+  process.stdout.write(paint(c.green, `✓ Reset "${name}" — next launch starts fresh.\n`));
+}
+
+module.exports = { manage, listProfiles, showCurrent, showEnv, printEnvRaw, exportConfig, importConfig, resetProfile, chooseProfile };
